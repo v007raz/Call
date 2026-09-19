@@ -37,21 +37,32 @@
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
     <style>
-        :root {
-            --app-height: 100vh;
-        }
-        
+        /* Mobile Viewport Fixes */
         body, html {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 0;
-            height: var(--app-height); /* Dynamic height for mobile keyboard fix */
+            position: fixed; /* Stops body from scrolling */
+            top: 0; left: 0; right: 0; bottom: 0;
+            height: 100%;
             width: 100vw;
             overflow: hidden;
             background-color: #f3f4f6;
             overscroll-behavior-y: none;
         }
         
+        #app-container {
+            height: 100%; /* Will be strictly controlled by JS for keyboard fix */
+            width: 100%;
+            max-width: 450px;
+            margin: 0 auto;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
         /* Custom scrollbar for chat */
         #chat-messages::-webkit-scrollbar { width: 5px; }
         #chat-messages::-webkit-scrollbar-track { background: transparent; }
@@ -82,7 +93,7 @@
 </head>
 <body class="flex items-center justify-center">
 
-    <div id="app-container" class="w-full max-w-md bg-white flex flex-col relative shadow-2xl h-full overflow-hidden">
+    <div id="app-container">
         
         <!-- Login Screen -->
         <div id="login-screen" class="absolute inset-0 bg-white z-20 flex flex-col items-center justify-center p-6 transition-transform duration-300">
@@ -91,32 +102,33 @@
                     <i class="ph-fill ph-whatsapp-logo text-5xl text-white"></i>
                 </div>
                 <h1 class="text-2xl font-bold text-gray-800">WhatsApp Cloud</h1>
-                <p class="text-sm text-gray-500 mt-2">Chat anytime, messages stay forever.</p>
+                <p class="text-sm text-gray-500 mt-2">Enter your IDs to connect securely</p>
             </div>
 
             <div class="w-full space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Your ID</label>
-                    <input type="text" id="my-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal focus:ring-1 focus:ring-wa-lightTeal transition" placeholder="e.g. rahul" autocomplete="off">
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Your ID (Fixed)</label>
+                    <input type="text" id="my-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal focus:ring-1 focus:ring-wa-lightTeal transition" placeholder="e.g. vikash123" autocomplete="off">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Partner's ID</label>
-                    <input type="text" id="partner-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal focus:ring-1 focus:ring-wa-lightTeal transition" placeholder="e.g. rohan" autocomplete="off">
+                    <input type="text" id="partner-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal focus:ring-1 focus:ring-wa-lightTeal transition" placeholder="e.g. rahul456" autocomplete="off">
                 </div>
                 
-                <button id="connect-btn" class="w-full bg-wa-lightTeal hover:bg-wa-teal text-white font-bold py-3.5 rounded-lg flex items-center justify-center gap-2 mt-4 transition shadow-md">
+                <button id="connect-btn" class="w-full bg-wa-lightTeal hover:bg-wa-teal text-white font-bold py-3.5 rounded-lg flex items-center justify-center gap-2 mt-4 transition shadow-md disabled:opacity-50">
                     Start Chatting
                     <i class="ph-bold ph-arrow-right"></i>
                 </button>
             </div>
             
-            <div id="login-status" class="text-sm mt-6 text-center font-medium h-6 text-gray-500">Connecting to Cloud...</div>
+            <div id="login-status" class="text-sm mt-6 text-center font-bold h-6 text-gray-500">Connecting to Cloud...</div>
         </div>
 
+        <!-- Chat Screen -->
         <div id="chat-screen" class="hidden absolute inset-0 bg-wa-chatBg flex flex-col z-10 bg-chat-pattern bg-cover bg-center">
             
             <!-- Chat Header -->
-            <div class="bg-wa-lightTeal text-white px-3 py-2 flex items-center justify-between shadow-md z-20">
+            <div class="bg-wa-lightTeal text-white px-3 py-2 flex items-center justify-between shadow-md z-20 shrink-0">
                 <div class="flex items-center gap-2">
                     <button id="btn-back" class="p-1 hover:bg-white/20 rounded-full transition">
                         <i class="ph-bold ph-arrow-left text-xl"></i>
@@ -124,9 +136,9 @@
                     <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
                         <i class="ph-fill ph-user text-2xl text-gray-500"></i>
                     </div>
-                    <div class="ml-1">
+                    <div class="ml-1 flex flex-col justify-center">
                         <h2 id="chat-partner-name" class="font-semibold text-[17px] leading-tight">Partner</h2>
-                        <p id="chat-status" class="text-[11px] text-wa-bg opacity-90">Online</p>
+                        <p id="chat-status" class="text-[11px] text-wa-bg opacity-90">Cloud Sync Active</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-1">
@@ -136,12 +148,12 @@
                     <button id="btn-audio-call" class="hover:bg-white/20 p-2 rounded-full transition">
                         <i class="ph-fill ph-phone text-xl"></i>
                     </button>
-                    <button id="btn-chat-menu" class="hover:bg-white/20 p-2 rounded-full transition">
+                    <button id="btn-chat-menu" class="hover:bg-white/20 p-2 rounded-full transition relative">
                         <i class="ph-fill ph-dots-three-vertical text-xl"></i>
                     </button>
                     
                     <!-- Dropdown Menu -->
-                    <div id="chat-dropdown" class="hidden absolute top-14 right-2 bg-white text-gray-800 shadow-xl rounded-lg w-44 overflow-hidden z-50 origin-top-right transition-transform">
+                    <div id="chat-dropdown" class="hidden absolute top-14 right-2 bg-white text-gray-800 shadow-xl rounded-lg w-44 overflow-hidden z-50 origin-top-right transition-transform border border-gray-100">
                         <button id="btn-clear-chat" class="w-full text-left px-4 py-3 hover:bg-gray-100 text-[15px] flex items-center gap-3">
                             <i class="ph ph-broom text-lg text-gray-600"></i> Clear Chat
                         </button>
@@ -150,24 +162,24 @@
             </div>
 
             <!-- Messages Area -->
-            <div id="chat-messages" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2 relative z-0 pb-2">
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2 relative z-0">
                 <div class="flex justify-center mb-4 mt-2">
                     <div class="bg-[#FFEECD] text-gray-700 text-[11px] px-4 py-1.5 rounded-lg text-center max-w-[90%] shadow-sm leading-snug">
                         <i class="ph-fill ph-lock-key inline align-middle mr-1"></i>
-                        Messages are now securely saved to the Cloud. You can chat even if the other person is offline.
+                        Messages are End-to-End Saved on Cloud. Chat anywhere anytime!
                     </div>
                 </div>
                 <!-- Messages injected here -->
             </div>
 
-            <!-- Input Area -->
-            <div id="input-container" class="bg-[#f0f2f5] px-2 py-2 flex items-end gap-2 z-10 w-full">
+            <!-- Input Area (Fixed for Mobile) -->
+            <div id="input-container" class="shrink-0 bg-[#f0f2f5] px-2 py-2 flex items-end gap-2 z-10 w-full border-t border-gray-200" style="padding-bottom: env(safe-area-inset-bottom, 8px);">
                 <div class="flex-1 bg-white rounded-2xl flex items-end shadow-sm border border-gray-200">
-                    <button class="p-3.5 text-gray-500 hover:text-gray-700">
+                    <button class="p-3 text-gray-500 hover:text-gray-700">
                         <i class="ph ph-smiley text-xl text-gray-400"></i>
                     </button>
-                    <textarea id="msg-input" rows="1" class="flex-1 bg-transparent py-3 focus:outline-none resize-none max-h-32 text-[15px] text-gray-800 leading-snug" placeholder="Message"></textarea>
-                    <button class="p-3.5 text-gray-500 hover:text-gray-700">
+                    <textarea id="msg-input" rows="1" class="flex-1 bg-transparent py-3 focus:outline-none resize-none max-h-28 text-[15px] text-gray-800 leading-snug" placeholder="Message"></textarea>
+                    <button class="p-3 text-gray-500 hover:text-gray-700">
                         <i class="ph ph-paperclip text-xl text-gray-400"></i>
                     </button>
                 </div>
@@ -197,7 +209,7 @@
         <div id="confirm-modal" class="hidden absolute inset-0 bg-black/40 z-[70] flex items-center justify-center p-4 backdrop-blur-sm">
             <div class="bg-white rounded-xl w-full max-w-[300px] p-5 shadow-2xl">
                 <h3 class="text-lg font-bold text-gray-800 mb-2">Clear this chat?</h3>
-                <p class="text-sm text-gray-600 mb-5">Messages will be removed from this device.</p>
+                <p class="text-sm text-gray-600 mb-5">Messages will be removed for you.</p>
                 <div class="flex justify-end gap-3">
                     <button id="btn-confirm-cancel" class="px-4 py-2 text-wa-teal font-medium hover:bg-gray-50 rounded">Cancel</button>
                     <button id="btn-confirm-clear" class="px-4 py-2 bg-wa-teal text-white font-medium rounded hover:bg-wa-lightTeal">Clear Chat</button>
@@ -234,7 +246,7 @@
                 <i class="ph-fill ph-phone-ringing text-5xl text-white"></i>
             </div>
             <h2 class="text-white text-2xl font-bold mt-6 mb-2" id="incoming-caller-id">Caller Name</h2>
-            <p class="text-gray-300 mb-12" id="incoming-call-type">Incoming video call</p>
+            <p class="text-gray-300 mb-12" id="incoming-call-type">Incoming call</p>
             
             <div class="flex gap-12">
                 <button id="reject-call-btn" class="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white shadow-lg">
@@ -247,99 +259,95 @@
         </div>
     </div>
 
+    <!-- Firebase SDK Imports -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, collection, query, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Environment variables
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'whatsapp-clone-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        
-        // Handle Mobile Viewport Resizing (Fix for keyboard overlap)
-        function setupMobileViewportFix() {
-            const setHeight = () => {
-                if(window.visualViewport) {
-                    const vh = window.visualViewport.height;
-                    document.documentElement.style.setProperty('--app-height', `${vh}px`);
-                    // Scroll to bottom of chat if open
-                    const chatArea = document.getElementById('chat-messages');
-                    if(chatArea && !document.getElementById('chat-screen').classList.contains('hidden')) {
-                        setTimeout(() => chatArea.scrollTop = chatArea.scrollHeight, 50);
-                    }
-                }
-            };
-            window.visualViewport?.addEventListener('resize', setHeight);
-            setHeight();
-        }
-        setupMobileViewportFix();
+        // Yahan par maine aapka exact Firebase Config laga diya hai!
+        const firebaseConfig = {
+            apiKey: "AIzaSyDHUttmxneJt1KZCf3d-9lRqrdxLxx76C0",
+            authDomain: "myweb-88daa.firebaseapp.com",
+            projectId: "myweb-88daa",
+            storageBucket: "myweb-88daa.firebasestorage.app",
+            messagingSenderId: "297038746284",
+            appId: "1:297038746284:web:272d0ecdc8a3cfa3a20509",
+            measurementId: "G-3KPXF8W72R"
+        };
 
-        // Check if Firebase is available
-        if (!firebaseConfig) {
-            document.getElementById('login-status').innerHTML = "⚠️ Firebase config missing. Environment restricted.";
-            document.getElementById('login-status').classList.add("text-red-500");
-        }
-
-        const app = firebaseConfig ? initializeApp(firebaseConfig) : null;
-        const auth = app ? getAuth(app) : null;
-        const db = app ? getFirestore(app) : null;
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
         
         let currentUserUid = null;
+        const loginStatus = document.getElementById('login-status');
+        const connectBtn = document.getElementById('connect-btn');
+        const appId = "my-whatsapp-clone";
 
-        // Init Auth
         async function initAuth() {
-            if(!auth) return;
             try {
-                const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                if (token) {
-                    await signInWithCustomToken(auth, token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                loginStatus.textContent = "Connecting to Cloud Server...";
+                await signInAnonymously(auth); 
                 currentUserUid = auth.currentUser.uid;
-                document.getElementById('login-status').textContent = "Database Connected. Ready.";
-                document.getElementById('login-status').classList.replace('text-gray-500', 'text-wa-lightTeal');
+                loginStatus.textContent = "✅ Connected to Cloud! You can login.";
+                loginStatus.classList.replace('text-gray-500', 'text-wa-lightTeal');
             } catch (err) {
                 console.error("Auth Error:", err);
-                document.getElementById('login-status').textContent = "Connection failed.";
+                loginStatus.textContent = "❌ Database Permission Error! (Check notes below)";
+                loginStatus.classList.replace('text-gray-500', 'text-red-500');
             }
         }
         initAuth();
 
-        let myId = '';
+        // Ye function phone ke keyboard aur navigation bar ke hisab se box ko upar rakhega
+        function setupMobileViewportFix() {
+            const appContainer = document.getElementById('app-container');
+            const chatMessages = document.getElementById('chat-messages');
+            
+            const adjustHeight = () => {
+                if (window.visualViewport) {
+                    const viewHeight = window.visualViewport.height;
+                    appContainer.style.height = `${viewHeight}px`;
+                    
+                    // Jab keyboard khule, chat ko sabase niche scroll kar do
+                    if(chatMessages && !document.getElementById('chat-screen').classList.contains('hidden')) {
+                        setTimeout(() => chatMessages.scrollTop = chatMessages.scrollHeight, 100);
+                    }
+                }
+            };
+            
+            window.visualViewport?.addEventListener('resize', adjustHeight);
+            adjustHeight(); // Initial call
+        }
+        setupMobileViewportFix();
+
+        let myId = localStorage.getItem('whatsapp_my_id') || '';
         let partnerId = '';
         let currentRoomId = '';
         let unsubscribeChat = null;
-        
-        // Local Cache for Chat History (In-memory representation of Firestore)
         let localChatStore = []; 
         let selectedMsgObj = null;
 
-        // PeerJS for Video/Audio only
         let peer = null;
         let mediaCall = null;
         let pendingCall = null;
         let localStream = null;
-        
+
         const ui = {
             login: document.getElementById('login-screen'),
             chat: document.getElementById('chat-screen'),
             messages: document.getElementById('chat-messages'),
-            status: document.getElementById('login-status'),
             dropdown: document.getElementById('chat-dropdown'),
             msgModal: document.getElementById('msg-action-modal'),
             confirmModal: document.getElementById('confirm-modal')
         };
-
         const inputs = {
             myId: document.getElementById('my-id-input'),
             partnerId: document.getElementById('partner-id-input'),
             msg: document.getElementById('msg-input')
         };
-
         const btn = {
-            connect: document.getElementById('connect-btn'),
-            send: document.getElementById('send-btn'),
             menu: document.getElementById('btn-chat-menu'),
             back: document.getElementById('btn-back'),
             clear: document.getElementById('btn-clear-chat'),
@@ -350,41 +358,35 @@
             cancelMsgAction: document.getElementById('btn-action-cancel')
         };
 
-        // Textarea Auto-resize
+        // Agar purani ID saved hai toh input me dikha do
+        if(myId) { inputs.myId.value = myId; }
+
         inputs.msg.addEventListener('input', function() {
             this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 128) + 'px'; // Max 32 lines roughly
+            this.style.height = Math.min(this.scrollHeight, 112) + 'px'; 
             if(this.value.trim() === '') this.style.height = 'auto';
+            setTimeout(() => ui.messages.scrollTop = ui.messages.scrollHeight, 10);
         });
 
-        // Close dropdowns on outside click
         document.addEventListener('click', (e) => {
             if(!btn.menu.contains(e.target) && !ui.dropdown.contains(e.target)) {
                 ui.dropdown.classList.add('hidden');
             }
         });
 
-        btn.connect.addEventListener('click', () => {
+        connectBtn.addEventListener('click', () => {
             myId = inputs.myId.value.trim().toLowerCase();
             partnerId = inputs.partnerId.value.trim().toLowerCase();
             
-            if (!myId || !partnerId) {
-                showStatus("Please enter both IDs", "text-red-500");
-                return;
-            }
-            if (myId === partnerId) {
-                showStatus("IDs cannot be the same", "text-red-500");
-                return;
-            }
-            if(!currentUserUid || !db) {
-                showStatus("System not ready yet", "text-orange-500");
-                return;
-            }
+            if (!myId || !partnerId) { alert("Please enter both IDs"); return; }
+            if (myId === partnerId) { alert("Your ID and Partner ID cannot be the same"); return; }
+            if(!currentUserUid) { alert("Please wait, Server is connecting..."); return; }
 
-            // Generate deterministic room ID (alphabetical order)
+            // Save my ID for next time
+            localStorage.setItem('whatsapp_my_id', myId);
+
             currentRoomId = [myId, partnerId].sort().join('_');
             
-            // Switch UI
             ui.login.classList.add('-translate-x-full');
             setTimeout(() => {
                 ui.login.classList.add('hidden');
@@ -393,64 +395,44 @@
                 document.getElementById('chat-partner-name').textContent = partnerId.charAt(0).toUpperCase() + partnerId.slice(1);
             }, 300);
 
-            // Init WebRTC Peer for calls (uses myId)
             initPeer(myId);
-            
-            // Start listening to Firebase
             startChatSync();
         });
 
-        function showStatus(msg, cls) {
-            ui.status.textContent = msg;
-            ui.status.className = `text-sm mt-6 text-center font-medium h-6 ${cls}`;
-        }
-
         btn.back.addEventListener('click', () => {
-            if(unsubscribeChat) {
-                unsubscribeChat();
-                unsubscribeChat = null;
-            }
-            if(peer) {
-                peer.destroy();
-                peer = null;
-            }
+            if(unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
+            if(peer) { peer.destroy(); peer = null; }
+            
+            inputs.partnerId.value = '';
             ui.chat.classList.add('hidden');
             ui.login.classList.remove('hidden');
         });
 
         function startChatSync() {
-            if(!db || !currentUserUid) return;
+            if(!currentUserUid) return;
 
-            // Clear old UI except the encryption notice
             Array.from(ui.messages.children).forEach(child => {
                 if(!child.querySelector('.ph-lock-key')) child.remove();
             });
             localChatStore = [];
 
-            // Listen to the specific room collection
-            // Path: /artifacts/{appId}/public/data/chat_{roomId}
             const roomCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId);
-            
-            // No complex queries as per rules, fetch all and sort in memory
             const q = query(roomCollectionRef);
             
             unsubscribeChat = onSnapshot(q, (snapshot) => {
                 const fetchedMessages = [];
                 snapshot.forEach(docSnap => {
                     const data = docSnap.data();
-                    // Don't process if it's marked deleted for ME
+                    // Agar maine 'Delete for me' kiya tha, toh fetch mat karo
                     if(data.deletedFor && data.deletedFor.includes(myId)) return;
                     fetchedMessages.push({ id: docSnap.id, ...data });
                 });
 
-                // Sort by timestamp
                 fetchedMessages.sort((a, b) => a.timestamp - b.timestamp);
-                
-                // Compare with local store and update UI
                 processIncomingMessages(fetchedMessages);
-                
             }, (error) => {
                 console.error("Firestore Listen Error:", error);
+                alert("Database permission error! Check Firestore Rules in Console.");
             });
         }
 
@@ -462,17 +444,15 @@
                 const existingIndex = localChatStore.findIndex(m => m.id === msg.id);
                 
                 if (existingIndex === -1) {
-                    // New message
                     localChatStore.push(msg);
                     renderMessageInDOM(msg, isSentByMe);
                     needsScroll = true;
 
-                    // If received a message and app is open, mark as read
+                    // Agar message maine nahi bheja, aur abhi read nahi hua, toh usko 'read' mark karo
                     if (!isSentByMe && msg.status !== 'read') {
                         markMessageAsRead(msg.id);
                     }
                 } else {
-                    // Existing message, check for updates (status or deleted)
                     const existingMsg = localChatStore[existingIndex];
                     if (existingMsg.status !== msg.status || existingMsg.isDeleted !== msg.isDeleted) {
                         localChatStore[existingIndex] = msg;
@@ -482,19 +462,19 @@
             });
 
             if(needsScroll) {
-                setTimeout(() => ui.messages.scrollTop = ui.messages.scrollHeight, 50);
+                setTimeout(() => ui.messages.scrollTop = ui.messages.scrollHeight, 100);
             }
         }
 
         async function markMessageAsRead(docId) {
-            if(!db || !currentUserUid) return;
+            if(!currentUserUid) return;
             try {
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, docId);
                 await updateDoc(docRef, { status: 'read' });
             } catch(e) { console.error("Error marking read:", e); }
         }
 
-        btn.send.addEventListener('click', sendMessage);
+        document.getElementById('send-btn').addEventListener('click', sendMessage);
         inputs.msg.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -504,12 +484,11 @@
 
         async function sendMessage() {
             const text = inputs.msg.value.trim();
-            if (!text || !db || !currentUserUid) return;
+            if (!text || !currentUserUid) return;
             
             const timestamp = Date.now();
             const docId = 'msg_' + timestamp + '_' + Math.random().toString(36).substr(2, 5);
             
-            // Reset Input
             inputs.msg.value = '';
             inputs.msg.style.height = 'auto';
 
@@ -517,7 +496,7 @@
                 text: text,
                 senderId: myId,
                 timestamp: timestamp,
-                status: 'sent',
+                status: 'sent', // Will change to 'read' when partner opens
                 isDeleted: false,
                 deletedFor: []
             };
@@ -549,11 +528,9 @@
             const bubble = document.createElement('div');
             bubble.id = 'bubble_' + msg.id;
             
-            // Add click listener for options menu
             bubble.addEventListener('click', () => {
                 selectedMsgObj = msg;
                 ui.msgModal.classList.remove('hidden');
-                // Show 'Delete for Everyone' only if I sent it and it's not already deleted
                 if (isSent && !msg.isDeleted) {
                     btn.delEveryone.classList.remove('hidden');
                 } else {
@@ -563,8 +540,7 @@
             
             wrapper.appendChild(bubble);
             ui.messages.appendChild(wrapper);
-            
-            updateMessageDOM(msg, isSent); // Populate contents
+            updateMessageDOM(msg, isSent);
         }
 
         function updateMessageDOM(msg, isSent) {
@@ -589,7 +565,8 @@
             const formattedText = msg.text.replace(/\n/g, '<br>');
             let ticksHtml = '';
             if (isSent) {
-                if (msg.status === 'sent' || msg.status === 'delivered') ticksHtml = '<i class="ph-bold ph-checks text-gray-400 text-[14px]"></i>';
+                if (msg.status === 'sent') ticksHtml = '<i class="ph-bold ph-check text-gray-400 text-[14px]"></i>';
+                if (msg.status === 'delivered') ticksHtml = '<i class="ph-bold ph-checks text-gray-400 text-[14px]"></i>';
                 if (msg.status === 'read') ticksHtml = '<i class="ph-bold ph-checks text-blue-500 text-[14px]"></i>';
             }
             
@@ -603,24 +580,19 @@
         }
 
         btn.menu.addEventListener('click', () => ui.dropdown.classList.toggle('hidden'));
-        
-        btn.cancelMsgAction.addEventListener('click', () => {
-            ui.msgModal.classList.add('hidden');
-            selectedMsgObj = null;
-        });
+        btn.cancelMsgAction.addEventListener('click', () => { ui.msgModal.classList.add('hidden'); selectedMsgObj = null; });
 
         btn.delMe.addEventListener('click', async () => {
-            if(!selectedMsgObj || !db || !currentUserUid) return;
+            if(!selectedMsgObj || !currentUserUid) return;
             const docId = selectedMsgObj.id;
             ui.msgModal.classList.add('hidden');
             
             try {
-                // Update Firestore to add myId to deletedFor array
+                // Add my ID to the deletedFor array
                 const newDeletedFor = [...(selectedMsgObj.deletedFor || []), myId];
                 const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, docId);
                 await updateDoc(docRef, { deletedFor: newDeletedFor });
                 
-                // Remove locally
                 const wrap = document.getElementById('wrap_' + docId);
                 if(wrap) wrap.remove();
                 localChatStore = localChatStore.filter(m => m.id !== docId);
@@ -628,7 +600,7 @@
         });
 
         btn.delEveryone.addEventListener('click', async () => {
-            if(!selectedMsgObj || !db || !currentUserUid) return;
+            if(!selectedMsgObj || !currentUserUid) return;
             const docId = selectedMsgObj.id;
             ui.msgModal.classList.add('hidden');
             
@@ -642,17 +614,14 @@
             ui.dropdown.classList.add('hidden');
             ui.confirmModal.classList.remove('hidden');
         });
-        
-        btn.cancelClear.addEventListener('click', () => {
-            ui.confirmModal.classList.add('hidden');
-        });
+        btn.cancelClear.addEventListener('click', () => ui.confirmModal.classList.add('hidden') );
 
         btn.confirmClear.addEventListener('click', async () => {
             ui.confirmModal.classList.add('hidden');
-            if(!db || !currentUserUid) return;
+            if(!currentUserUid) return;
             
-            // To clear chat for ME, add myId to deletedFor of ALL active messages
             try {
+                // Batch update all visible messages as deletedFor me
                 const batchPromises = localChatStore.map(msg => {
                     const newDeletedFor = [...(msg.deletedFor || []), myId];
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, msg.id);
@@ -660,7 +629,6 @@
                 });
                 await Promise.all(batchPromises);
                 
-                // Clear UI
                 Array.from(ui.messages.children).forEach(child => {
                     if(!child.querySelector('.ph-lock-key')) child.remove();
                 });
@@ -676,10 +644,8 @@
                     { url: 'stun:stun1.l.google.com:19302' }
                 ]}
             });
-
-            peer.on('open', () => { console.log("Call Server Connected"); });
+            peer.on('open', () => console.log("Call Server Connected"));
             peer.on('call', handleIncomingCall);
-            peer.on('error', (err) => console.error("Peer Error:", err));
         }
 
         async function getMediaStream(video = true) {
@@ -802,8 +768,7 @@
                 
                 document.getElementById('call-screen').classList.add('hidden');
                 ui.chat.classList.remove('hidden');
-                // Adjust scroll height again
-                setTimeout(() => ui.messages.scrollTop = ui.messages.scrollHeight, 50);
+                setTimeout(() => ui.messages.scrollTop = ui.messages.scrollHeight, 100);
             }, 1500);
         }
 
@@ -846,7 +811,6 @@
                 }
             }
         });
-
     </script>
 </body>
 </html>

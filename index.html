@@ -255,7 +255,6 @@
 
         if(myId) { inputs.myId.value = myId; }
 
-        // --- Direct Viewport Height Fix for Mobile Keyboards ---
         function setupMobileViewportFix() {
             const appContainer = document.getElementById('app-container');
             const adjustHeight = () => {
@@ -317,15 +316,14 @@
         function startPresenceSync() {
             updateMyPresence(true);
             if(presenceInterval) clearInterval(presenceInterval);
-            presenceInterval = setInterval(() => updateMyPresence(true), 5000);
+            presenceInterval = setInterval(() => updateMyPresence(true), 4000);
 
             const partnerRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence_' + partnerId);
             onSnapshot(partnerRef, (docSnap) => {
                 const statusEl = document.getElementById('chat-status');
                 if(docSnap.exists()) {
                     const data = docSnap.data();
-                    // Agar last seen 15 seconds ke andar update hua hai toh online maanege
-                    const isOnline = data.online && (Date.now() - data.lastSeen < 15000);
+                    const isOnline = data.online && (Date.now() - data.lastSeen < 12000);
                     if(isOnline) {
                         statusEl.textContent = "Online";
                         statusEl.classList.add('font-bold', 'text-white');
@@ -344,29 +342,48 @@
             });
         }
 
-        // --- PeerJS Calling Setup ---
+        // --- Enhanced PeerJS Calling Setup with Public STUN Servers ---
         function initPeer(id) {
             if(peer) peer.destroy();
             peer = new Peer(id, {
                 host: '0.peerjs.com',
                 port: 443,
                 secure: true,
-                debug: 1
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:global.stun.twilio.com:3478' }
+                    ]
+                },
+                debug: 2
             });
-            peer.on('open', () => console.log("Peer Connected"));
+            peer.on('open', (id) => console.log("Peer Connected with ID:", id));
             peer.on('call', handleIncomingCall);
+            peer.on('error', (err) => {
+                console.error("Peer error:", err);
+                if(err.type === 'peer-unavailable') {
+                    alert("Partner is offline or not connected to the call server.");
+                }
+            });
         }
 
         async function getMediaStream(video = true) {
-            try { return await navigator.mediaDevices.getUserMedia({ video: video, audio: true }); }
-            catch (err) { alert("Camera/Microphone access blocked or unavailable."); return null; }
+            try { 
+                return await navigator.mediaDevices.getUserMedia({ 
+                    video: video ? { width: { ideal: 640 }, height: { ideal: 480 } } : false, 
+                    audio: true 
+                }); 
+            } catch (err) { 
+                alert("Camera/Microphone access blocked or unavailable."); 
+                return null; 
+            }
         }
 
         btn.videoCall.addEventListener('click', () => initiateCall(true));
         btn.audioCall.addEventListener('click', () => initiateCall(false));
 
         async function initiateCall(withVideo) {
-            if (!peer || !partnerId) return;
+            if (!peer || !partnerId) return alert("Not connected to call network!");
             localStream = await getMediaStream(withVideo);
             if (!localStream) return;
 

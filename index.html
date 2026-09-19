@@ -122,7 +122,7 @@
                         <input type="file" id="media-input" style="display: none;" accept="image/*,video/*,audio/*,application/pdf">
                     </label>
                 </div>
-                <button id="send-btn" class="w-12 h-12 rounded-full bg-wa-lightTeal hover:bg-wa-teal text-white flex items-center justify-center shrink-0 shadow-sm disabled:opacity-50">
+                <button id="send-btn" type="button" class="w-12 h-12 rounded-full bg-wa-lightTeal hover:bg-wa-teal text-white flex items-center justify-center shrink-0 shadow-sm">
                     <i class="ph-fill ph-paper-plane-right text-xl ml-1" id="send-icon"></i>
                 </button>
             </div>
@@ -132,17 +132,19 @@
             </div>
         </div>
 
-        <!-- Theme Picker Modal -->
+        <!-- Theme Picker Modal with Multiple Colors -->
         <div id="theme-modal" class="hidden absolute inset-0 bg-black/40 z-[70] flex items-center justify-center p-4 backdrop-blur-sm">
-            <div class="bg-white rounded-2xl w-full max-w-[320px] p-5 shadow-2xl">
-                <h3 class="text-lg font-bold text-gray-800 mb-3">Choose Chat Background</h3>
-                <div class="grid grid-cols-2 gap-3 mb-4">
-                    <button onclick="setTheme('#efeae2')" class="p-3 rounded-xl bg-[#efeae2] border border-gray-300 font-medium text-xs text-gray-700">Default WhatsApp</button>
+            <div class="bg-white rounded-2xl w-full max-w-[340px] p-5 shadow-2xl">
+                <h3 class="text-lg font-bold text-gray-800 mb-3">Choose Background Color</h3>
+                <div class="grid grid-cols-2 gap-3 mb-4 max-h-[260px] overflow-y-auto pr-1">
+                    <button onclick="setTheme('#efeae2')" class="p-3 rounded-xl bg-[#efeae2] border border-gray-300 font-medium text-xs text-gray-800">WhatsApp Default</button>
                     <button onclick="setTheme('#111b21')" class="p-3 rounded-xl bg-[#111b21] border border-gray-700 font-medium text-xs text-white">Dark Theme</button>
                     <button onclick="setTheme('#0b141a')" class="p-3 rounded-xl bg-[#0b141a] border border-gray-700 font-medium text-xs text-white">Pitch Black</button>
                     <button onclick="setTheme('#e2f4f3')" class="p-3 rounded-xl bg-[#e2f4f3] border border-gray-300 font-medium text-xs text-teal-900">Soft Mint</button>
                     <button onclick="setTheme('#fce4ec')" class="p-3 rounded-xl bg-[#fce4ec] border border-gray-300 font-medium text-xs text-pink-900">Rose Pink</button>
                     <button onclick="setTheme('#e8eaf6')" class="p-3 rounded-xl bg-[#e8eaf6] border border-gray-300 font-medium text-xs text-indigo-900">Lavender Blue</button>
+                    <button onclick="setTheme('#fff3e0')" class="p-3 rounded-xl bg-[#fff3e0] border border-gray-300 font-medium text-xs text-orange-900">Warm Peach</button>
+                    <button onclick="setTheme('#e0f7fa')" class="p-3 rounded-xl bg-[#e0f7fa] border border-gray-300 font-medium text-xs text-cyan-900">Sky Blue</button>
                 </div>
                 <button id="btn-close-theme" class="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-xl">Cancel</button>
             </div>
@@ -239,7 +241,6 @@
         let localChatStore = []; let selectedMsgObj = null;
         let replyingToObj = null; let editingMsgObj = null;
 
-        // WebRTC Direct Calling variables
         let peerConnection = null; let localStream = null; let unsubscribeCallSignal = null;
         const iceServers = {
             iceServers: [
@@ -403,7 +404,6 @@
             });
         }
 
-        // --- DIRECT FIREBASE WEBRTC CALLING SYSTEM ---
         async function getMediaStream(video = true) {
             try { 
                 return await navigator.mediaDevices.getUserMedia({ 
@@ -418,7 +418,6 @@
 
         function createPeerConnection(isCaller, callId, withVideo) {
             peerConnection = new RTCPeerConnection(iceServers);
-
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
             peerConnection.ontrack = (event) => {
@@ -431,7 +430,6 @@
                     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'call_' + callId + '_candidates_' + myId, 'cand_' + Date.now()), event.candidate.toJSON());
                 }
             };
-
             return peerConnection;
         }
 
@@ -459,7 +457,6 @@
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
 
-            // Send Offer via Firebase
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'active_call_' + partnerId), {
                 caller: myId,
                 type: withVideo ? 'video' : 'audio',
@@ -468,7 +465,6 @@
                 timestamp: Date.now()
             });
 
-            // Listen for Answer
             unsubscribeCallSignal = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'call_answer_' + myId), async (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
@@ -478,7 +474,6 @@
                 }
             });
 
-            // Listen for remote candidates
             onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'call_' + callId + '_candidates_' + partnerId), (snapshot) => {
                 snapshot.docChanges().forEach(async (change) => {
                     if (change.type === 'added') {
@@ -536,7 +531,6 @@
                     });
                 });
 
-                // Clear incoming call doc
                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'active_call_' + myId)).catch(()=>{});
                 pendingCallData = null;
             }
@@ -578,7 +572,6 @@
 
         btn.endCall.addEventListener('click', endCallUI);
 
-        // --- Chat Sync & Messaging ---
         function startChatSync() {
             if(!currentUserUid) return;
             Array.from(ui.messages.children).forEach(child => { if(!child.querySelector('.ph-lock-key')) child.remove(); });
@@ -643,12 +636,24 @@
             });
         }
 
-        btn.send.addEventListener('click', (e) => { e.preventDefault(); sendMessage(); inputs.msg.focus(); });
-        inputs.msg.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+        // --- FIXED SEND BUTTON LISTENER ---
+        btn.send.addEventListener('click', (e) => {
+            e.preventDefault();
+            sendMessage();
+            inputs.msg.focus();
+        });
+
+        inputs.msg.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
 
         async function sendMessage(overrideText = '', mediaData = null) {
             const text = overrideText !== '' ? overrideText : inputs.msg.value.trim();
-            if (!text && !mediaData) return; if (!currentUserUid) return alert("System not connected!");
+            if (!text && !mediaData) return; 
+            if (!currentUserUid) return alert("System not connected!");
 
             const typingRef = doc(db, 'artifacts', appId, 'public', 'data', 'typing_' + currentRoomId);
             setDoc(typingRef, { [myId]: false }, { merge: true });

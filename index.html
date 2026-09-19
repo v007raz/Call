@@ -77,7 +77,7 @@
         </div>
 
         <!-- Chat Screen -->
-        <div id="chat-screen" class="hidden absolute inset-0 bg-wa-chatBg flex flex-col z-10 bg-chat-pattern bg-cover bg-center">
+        <div id="chat-screen" class="hidden absolute inset-0 bg-wa-chatBg flex flex-col z-10 bg-chat-pattern bg-cover bg-center" id="chat-bg-area">
             
             <div class="bg-wa-lightTeal text-white px-3 py-2 flex items-center justify-between shadow-md z-20 shrink-0">
                 <div class="flex items-center gap-2">
@@ -93,8 +93,9 @@
                     <button id="btn-audio-call" class="hover:bg-white/20 p-2 rounded-full"><i class="ph-fill ph-phone text-xl"></i></button>
                     <button id="btn-chat-menu" class="hover:bg-white/20 p-2 rounded-full relative"><i class="ph-fill ph-dots-three-vertical text-xl"></i></button>
                     
-                    <div id="chat-dropdown" class="hidden absolute top-14 right-2 bg-white text-gray-800 shadow-xl rounded-lg w-44 overflow-hidden z-50 origin-top-right border border-gray-100">
-                        <button id="btn-clear-chat" class="w-full text-left px-4 py-3 hover:bg-gray-100 text-[15px] flex items-center gap-3"><i class="ph ph-broom text-lg text-gray-600"></i> Clear Chat</button>
+                    <div id="chat-dropdown" class="hidden absolute top-14 right-2 bg-white text-gray-800 shadow-xl rounded-lg w-52 overflow-hidden z-50 origin-top-right border border-gray-100">
+                        <button id="btn-change-theme" class="w-full text-left px-4 py-3 hover:bg-gray-100 text-[15px] flex items-center gap-3 border-b border-gray-100"><i class="ph ph-palette text-lg text-gray-600"></i> Change Background</button>
+                        <button id="btn-clear-chat" class="w-full text-left px-4 py-3 hover:bg-gray-100 text-[15px] flex items-center gap-3 text-red-600"><i class="ph ph-broom text-lg"></i> Clear Chat</button>
                     </div>
                 </div>
             </div>
@@ -134,6 +135,27 @@
             
             <div id="upload-progress-bar" class="hidden absolute top-[60px] left-0 w-full bg-wa-teal text-white text-xs font-semibold text-center py-1.5 z-30 shadow-md">
                 Optimizing & Sending... <span id="upload-percent">0%</span>
+            </div>
+        </div>
+
+        <!-- Custom Color Background Picker Modal -->
+        <div id="theme-modal" class="hidden absolute inset-0 bg-black/40 z-[70] flex items-center justify-center p-4 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl w-full max-w-[340px] p-5 shadow-2xl">
+                <h3 class="text-lg font-bold text-gray-800 mb-3">Customize Chat Background</h3>
+                <div class="mb-4 space-y-3">
+                    <label class="block text-xs font-semibold text-gray-600">Pick Custom Color:</label>
+                    <div class="flex items-center gap-3">
+                        <input type="color" id="custom-color-picker" value="#efeae2" class="w-12 h-12 rounded-xl cursor-pointer border-0 p-0">
+                        <span class="text-sm text-gray-700 font-medium">Select any color of your choice</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <button onclick="setThemeBg('url(\'https://w0.peakpx.com/wallpaper/818/148/HD-wallpaper-whatsapp-background-cool-dark-green-new-theme-whatsapp.jpg\')', true)" class="p-2.5 rounded-xl bg-gray-100 border border-gray-300 font-medium text-xs text-gray-700">WhatsApp Pattern</button>
+                    <button onclick="setThemeBg('#111b21', false)" class="p-2.5 rounded-xl bg-[#111b21] text-white font-medium text-xs">Dark Theme</button>
+                    <button onclick="setThemeBg('#0b141a', false)" class="p-2.5 rounded-xl bg-[#0b141a] text-white font-medium text-xs">Pitch Black</button>
+                    <button onclick="setThemeBg('#e2f4f3', false)" class="p-2.5 rounded-xl bg-[#e2f4f3] text-teal-900 font-medium text-xs">Soft Mint</button>
+                </div>
+                <button id="btn-close-theme" class="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-xl">Cancel</button>
             </div>
         </div>
 
@@ -204,7 +226,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, query, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, query, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDHUttmxneJt1KZCf3d-9lRqrdxLxx76C0",
@@ -224,16 +246,24 @@
         const appId = "my-whatsapp-clone";
         
         let myId = localStorage.getItem('whatsapp_my_id') || '';
-        let partnerId = ''; let currentRoomId = ''; let unsubscribeChat = null; let presenceInterval = null;
+        let partnerId = ''; let currentRoomId = ''; let unsubscribeChat = null; let presenceInterval = null; let typingTimeout = null;
         let localChatStore = []; let selectedMsgObj = null;
         let replyingToObj = null; let editingMsgObj = null;
 
-        let peer = null; let mediaCall = null; let pendingCall = null; let localStream = null;
+        // WebRTC Direct Calling variables
+        let peerConnection = null; let localStream = null; let unsubscribeCallSignal = null;
+        const iceServers = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:global.stun.twilio.com:3478' }
+            ]
+        };
 
         const ui = {
             login: document.getElementById('login-screen'), chat: document.getElementById('chat-screen'),
             messages: document.getElementById('chat-messages'), dropdown: document.getElementById('chat-dropdown'),
             msgModal: document.getElementById('msg-action-modal'), confirmModal: document.getElementById('confirm-modal'),
+            themeModal: document.getElementById('theme-modal'), colorPicker: document.getElementById('custom-color-picker'),
             uploadBar: document.getElementById('upload-progress-bar'), uploadPercent: document.getElementById('upload-percent'),
             replyBox: document.getElementById('reply-preview-box'),
             viewerModal: document.getElementById('image-viewer-modal'), viewerImg: document.getElementById('viewer-img'), viewerDownload: document.getElementById('viewer-download-btn'),
@@ -245,7 +275,8 @@
         };
         const btn = {
             menu: document.getElementById('btn-chat-menu'), back: document.getElementById('btn-back'),
-            clear: document.getElementById('btn-clear-chat'), send: document.getElementById('send-btn'),
+            clear: document.getElementById('btn-clear-chat'), theme: document.getElementById('btn-change-theme'), closeTheme: document.getElementById('btn-close-theme'),
+            send: document.getElementById('send-btn'),
             delMe: document.getElementById('btn-delete-me'), delEveryone: document.getElementById('btn-delete-everyone'), 
             cancelAction: document.getElementById('btn-action-cancel'), reply: document.getElementById('btn-reply-msg'),
             edit: document.getElementById('btn-edit-msg'), cancelReply: document.getElementById('btn-cancel-reply'),
@@ -277,10 +308,47 @@
         }
         initAuth();
 
+        // --- Custom Color Background Handler ---
+        window.setThemeBg = function(value, isPattern) {
+            if(isPattern) {
+                ui.chat.style.backgroundImage = value;
+                ui.chat.style.backgroundColor = '#efeae2';
+            } else {
+                ui.chat.style.backgroundImage = 'none';
+                ui.chat.style.backgroundColor = value;
+            }
+            localStorage.setItem('wa_chat_bg_val', value);
+            localStorage.setItem('wa_chat_is_pattern', isPattern);
+            ui.themeModal.classList.add('hidden');
+            ui.dropdown.classList.add('hidden');
+        };
+
+        ui.colorPicker.addEventListener('input', (e) => {
+            setThemeBg(e.target.value, false);
+        });
+
+        const savedBgVal = localStorage.getItem('wa_chat_bg_val');
+        const savedIsPattern = localStorage.getItem('wa_chat_is_pattern') === 'true';
+        if(savedBgVal) {
+            setThemeBg(savedBgVal, savedIsPattern);
+        }
+
+        btn.theme.addEventListener('click', () => { ui.dropdown.classList.add('hidden'); ui.themeModal.classList.remove('hidden'); });
+        btn.closeTheme.addEventListener('click', () => ui.themeModal.classList.add('hidden'));
+
         inputs.msg.addEventListener('input', function() {
             this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 112) + 'px'; 
             if(this.value.trim() === '') this.style.height = 'auto';
             setTimeout(() => ui.messages.scrollTop = ui.messages.scrollHeight, 10);
+
+            if(currentUserUid && currentRoomId) {
+                const typingRef = doc(db, 'artifacts', appId, 'public', 'data', 'typing_' + currentRoomId);
+                setDoc(typingRef, { [myId]: true, timestamp: Date.now() }, { merge: true });
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    setDoc(typingRef, { [myId]: false }, { merge: true });
+                }, 2000);
+            }
         });
 
         document.getElementById('connect-btn').addEventListener('click', () => {
@@ -296,13 +364,13 @@
             }, 300);
             startChatSync();
             startPresenceSync();
-            initPeer(myId);
+            listenForIncomingCalls();
         });
 
         btn.back.addEventListener('click', () => {
             if(unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
             if(presenceInterval) { clearInterval(presenceInterval); presenceInterval = null; }
-            if(peer) { peer.destroy(); peer = null; }
+            if(unsubscribeCallSignal) { unsubscribeCallSignal(); unsubscribeCallSignal = null; }
             updateMyPresence(false);
             ui.chat.classList.add('hidden'); ui.login.classList.remove('hidden');
         });
@@ -318,55 +386,85 @@
         function startPresenceSync() {
             updateMyPresence(true);
             if(presenceInterval) clearInterval(presenceInterval);
-            presenceInterval = setInterval(() => updateMyPresence(true), 5000);
+            presenceInterval = setInterval(() => updateMyPresence(true), 4000);
 
             const partnerRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence_' + partnerId);
+            const typingRef = doc(db, 'artifacts', appId, 'public', 'data', 'typing_' + currentRoomId);
+
             onSnapshot(partnerRef, (docSnap) => {
                 const statusEl = document.getElementById('chat-status');
                 if(docSnap.exists()) {
                     const data = docSnap.data();
-                    const isOnline = data.online && (Date.now() - data.lastSeen < 15000);
-                    if(isOnline) {
-                        statusEl.textContent = "Online";
-                        statusEl.classList.add('font-bold', 'text-white');
-                    } else {
-                        statusEl.classList.remove('font-bold', 'text-white');
-                        if(data.lastSeen) {
-                            const d = new Date(data.lastSeen);
-                            statusEl.textContent = `Last seen at ${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                    const isOnline = data.online && (Date.now() - data.lastSeen < 12000);
+                    if(!statusEl.dataset.isTyping) {
+                        if(isOnline) {
+                            statusEl.textContent = "Online";
+                            statusEl.classList.add('font-bold', 'text-white');
                         } else {
-                            statusEl.textContent = "Offline";
+                            statusEl.classList.remove('font-bold', 'text-white');
+                            if(data.lastSeen) {
+                                const d = new Date(data.lastSeen);
+                                statusEl.textContent = `Last seen at ${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                            } else {
+                                statusEl.textContent = "Offline";
+                            }
                         }
                     }
-                } else {
-                    statusEl.textContent = "Offline";
+                }
+            });
+
+            onSnapshot(typingRef, (docSnap) => {
+                const statusEl = document.getElementById('chat-status');
+                if(docSnap.exists()) {
+                    const data = docSnap.data();
+                    const isPartnerTyping = data[partnerId] === true;
+                    if(isPartnerTyping) {
+                        statusEl.dataset.isTyping = "true";
+                        statusEl.textContent = "typing...";
+                        statusEl.classList.add('font-bold', 'text-green-300');
+                    } else {
+                        statusEl.dataset.isTyping = "";
+                        statusEl.classList.remove('font-bold', 'text-green-300');
+                    }
                 }
             });
         }
 
-        // --- PeerJS Calling Setup ---
-        function initPeer(id) {
-            if(peer) peer.destroy();
-            peer = new Peer(id, {
-                host: '0.peerjs.com',
-                port: 443,
-                secure: true,
-                debug: 1
-            });
-            peer.on('open', () => console.log("Peer Connected"));
-            peer.on('call', handleIncomingCall);
+        // --- ROBUST FIREBASE WEBRTC CALLING SYSTEM ---
+        async function getMediaStream(video = true) {
+            try { 
+                return await navigator.mediaDevices.getUserMedia({ 
+                    video: video ? { width: { ideal: 640 }, height: { ideal: 480 } } : false, 
+                    audio: true 
+                }); 
+            } catch (err) { 
+                alert("Camera/Microphone access blocked or unavailable."); 
+                return null; 
+            }
         }
 
-        async function getMediaStream(video = true) {
-            try { return await navigator.mediaDevices.getUserMedia({ video: video, audio: true }); }
-            catch (err) { alert("Camera/Microphone access blocked or unavailable."); return null; }
+        function createPeerConnection(callId) {
+            peerConnection = new RTCPeerConnection(iceServers);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            peerConnection.ontrack = (event) => {
+                document.getElementById('remote-video').srcObject = event.streams[0];
+                startCallTimer();
+            };
+
+            peerConnection.onicecandidate = async (event) => {
+                if (event.candidate) {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'call_' + callId + '_candidates_' + myId, 'cand_' + Date.now()), event.candidate.toJSON());
+                }
+            };
+            return peerConnection;
         }
 
         btn.videoCall.addEventListener('click', () => initiateCall(true));
         btn.audioCall.addEventListener('click', () => initiateCall(false));
 
         async function initiateCall(withVideo) {
-            if (!peer || !partnerId) return alert("Not connected to call network!");
+            if (!partnerId) return;
             localStream = await getMediaStream(withVideo);
             if (!localStream) return;
 
@@ -380,57 +478,95 @@
             ui.chat.classList.add('hidden');
             ui.callScreen.classList.remove('hidden');
 
-            const call = peer.call(partnerId, localStream, { metadata: { type: withVideo ? 'video' : 'audio' } });
-            setupCallHandlers(call);
+            const callId = currentRoomId;
+            const pc = createPeerConnection(callId);
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'active_call_' + partnerId), {
+                caller: myId, type: withVideo ? 'video' : 'audio',
+                offer: { type: offer.type, sdp: offer.sdp }, callId: callId, timestamp: Date.now()
+            });
+
+            unsubscribeCallSignal = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'call_answer_' + myId), async (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data.answer && !pc.currentRemoteDescription) {
+                        await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+                    }
+                }
+            });
+
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'call_' + callId + '_candidates_' + partnerId), (snapshot) => {
+                snapshot.docChanges().forEach(async (change) => {
+                    if (change.type === 'added') {
+                        try { await pc.addIceCandidate(new RTCIceCandidate(change.doc.data())); } catch(e){}
+                    }
+                });
+            });
         }
 
-        function handleIncomingCall(call) {
-            if (mediaCall || pendingCall) { call.close(); return; }
-            pendingCall = call;
-            document.getElementById('incoming-caller-id').textContent = call.peer;
-            ui.incomingModal.classList.remove('hidden');
+        let pendingCallData = null;
+        function listenForIncomingCalls() {
+            if(!myId) return;
+            onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'active_call_' + myId), (docSnap) => {
+                if(docSnap.exists()) {
+                    const data = docSnap.data();
+                    if(data && data.caller && data.caller !== myId && (Date.now() - data.timestamp < 30000)) {
+                        pendingCallData = data;
+                        document.getElementById('incoming-caller-id').textContent = data.caller;
+                        ui.incomingModal.classList.remove('hidden');
+                    }
+                }
+            });
         }
 
         btn.acceptCall.addEventListener('click', async () => {
-            if (!pendingCall) return;
-            const isVideo = pendingCall.metadata && pendingCall.metadata.type === 'video';
-            localStream = await getMediaStream(isVideo);
+            if (!pendingCallData) return;
+            const withVideo = pendingCallData.type === 'video';
+            localStream = await getMediaStream(withVideo);
             
             if (localStream) {
                 document.getElementById('local-video').srcObject = localStream;
-                if(!isVideo) document.getElementById('local-video-container').classList.add('hidden');
+                if(!withVideo) document.getElementById('local-video-container').classList.add('hidden');
                 else document.getElementById('local-video-container').classList.remove('hidden');
-                
-                pendingCall.answer(localStream);
-                setupCallHandlers(pendingCall);
                 
                 ui.incomingModal.classList.add('hidden');
                 ui.chat.classList.add('hidden');
                 ui.callScreen.classList.remove('hidden');
-                pendingCall = null;
-            } else {
-                pendingCall.close();
-                ui.incomingModal.classList.add('hidden');
-                pendingCall = null;
+
+                const callId = pendingCallData.callId;
+                const pc = createPeerConnection(callId);
+
+                await pc.setRemoteDescription(new RTCSessionDescription(pendingCallData.offer));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'call_answer_' + pendingCallData.caller), {
+                    answer: { type: answer.type, sdp: answer.sdp }
+                });
+
+                onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'call_' + callId + '_candidates_' + pendingCallData.caller), (snapshot) => {
+                    snapshot.docChanges().forEach(async (change) => {
+                        if (change.type === 'added') {
+                            try { await pc.addIceCandidate(new RTCIceCandidate(change.doc.data())); } catch(e){}
+                        }
+                    });
+                });
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'active_call_' + myId)).catch(()=>{});
+                pendingCallData = null;
             }
         });
 
-        btn.rejectCall.addEventListener('click', () => {
-            if (pendingCall) { pendingCall.close(); ui.incomingModal.classList.add('hidden'); pendingCall = null; }
+        btn.rejectCall.addEventListener('click', async () => {
+            ui.incomingModal.classList.add('hidden');
+            if (pendingCallData) {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'active_call_' + myId)).catch(()=>{});
+                pendingCallData = null;
+            }
         });
 
         let callInterval = null; let callSeconds = 0;
-        function setupCallHandlers(call) {
-            mediaCall = call;
-            document.getElementById('call-partner-display').textContent = call.peer;
-            call.on('stream', (remoteStream) => {
-                document.getElementById('remote-video').srcObject = remoteStream;
-                startCallTimer();
-            });
-            call.on('close', endCallUI);
-            call.on('error', endCallUI);
-        }
-
         function startCallTimer() {
             callSeconds = 0; clearInterval(callInterval);
             callInterval = setInterval(() => {
@@ -441,20 +577,20 @@
             }, 1000);
         }
 
-        function endCallUI() {
+        btn.endCall.addEventListener('click', () => {
             clearInterval(callInterval);
             document.getElementById('call-duration').textContent = "Call Ended";
-            setTimeout(() => {
-                if (mediaCall) { mediaCall.close(); mediaCall = null; }
+            setTimeout(async () => {
+                if (peerConnection) { peerConnection.close(); peerConnection = null; }
                 if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+                if (unsubscribeCallSignal) { unsubscribeCallSignal(); unsubscribeCallSignal = null; }
                 document.getElementById('remote-video').srcObject = null;
                 document.getElementById('local-video').srcObject = null;
                 ui.callScreen.classList.add('hidden');
                 ui.chat.classList.remove('hidden');
-            }, 1200);
-        }
-
-        btn.endCall.addEventListener('click', () => { if(mediaCall) mediaCall.close(); else endCallUI(); });
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'active_call_' + myId)).catch(()=>{});
+            }, 1000);
+        });
 
         function startChatSync() {
             if(!currentUserUid) return;
@@ -520,7 +656,7 @@
             });
         }
 
-        // --- GUARANTEED WORKING SEND BUTTON EVENT ---
+        // --- WORKING SEND BUTTON LISTENERS ---
         const handleSendAction = (e) => {
             e.preventDefault();
             e.stopPropagation();

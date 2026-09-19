@@ -15,6 +15,9 @@
                             teal: '#075E54', lightTeal: '#128C7E', green: '#25D366',
                             bg: '#ECE5DD', chatBg: '#efeae2', sent: '#dcf8c6', rcvd: '#ffffff'
                         }
+                    },
+                    backgroundImage: {
+                        'chat-pattern': "url('https://w0.peakpx.com/wallpaper/818/148/HD-wallpaper-whatsapp-background-cool-dark-green-new-theme-whatsapp.jpg')"
                     }
                 }
             }
@@ -71,7 +74,7 @@
         </div>
 
         <!-- Chat Screen -->
-        <div id="chat-screen" class="hidden absolute inset-0 bg-wa-chatBg flex flex-col z-10 bg-cover bg-center" style="background-color: #efeae2;">
+        <div id="chat-screen" class="hidden absolute inset-0 bg-wa-chatBg flex flex-col z-10 bg-chat-pattern bg-cover bg-center">
             
             <div class="bg-wa-lightTeal text-white px-3 py-2 flex items-center justify-between shadow-md z-20 shrink-0">
                 <div class="flex items-center gap-2">
@@ -87,9 +90,8 @@
                     <button id="btn-audio-call" class="hover:bg-white/20 p-2 rounded-full"><i class="ph-fill ph-phone text-xl"></i></button>
                     <button id="btn-chat-menu" class="hover:bg-white/20 p-2 rounded-full relative"><i class="ph-fill ph-dots-three-vertical text-xl"></i></button>
                     
-                    <div id="chat-dropdown" class="hidden absolute top-14 right-2 bg-white text-gray-800 shadow-xl rounded-lg w-52 overflow-hidden z-50 origin-top-right border border-gray-100">
-                        <button id="btn-change-theme" class="w-full text-left px-4 py-3 hover:bg-gray-100 text-[15px] flex items-center gap-3 border-b border-gray-100"><i class="ph ph-palette text-lg text-gray-600"></i> Change Background</button>
-                        <button id="btn-clear-chat" class="w-full text-left px-4 py-3 hover:bg-gray-100 text-[15px] flex items-center gap-3 text-red-600"><i class="ph ph-broom text-lg"></i> Clear Chat</button>
+                    <div id="chat-dropdown" class="hidden absolute top-14 right-2 bg-white text-gray-800 shadow-xl rounded-lg w-44 overflow-hidden z-50 origin-top-right border border-gray-100">
+                        <button id="btn-clear-chat" class="w-full text-left px-4 py-3 hover:bg-gray-100 text-[15px] flex items-center gap-3"><i class="ph ph-broom text-lg text-gray-600"></i> Clear Chat</button>
                     </div>
                 </div>
             </div>
@@ -129,24 +131,6 @@
             
             <div id="upload-progress-bar" class="hidden absolute top-[60px] left-0 w-full bg-wa-teal text-white text-xs font-semibold text-center py-1.5 z-30 shadow-md">
                 Optimizing & Sending... <span id="upload-percent">0%</span>
-            </div>
-        </div>
-
-        <!-- Theme Picker Modal with Multiple Colors -->
-        <div id="theme-modal" class="hidden absolute inset-0 bg-black/40 z-[70] flex items-center justify-center p-4 backdrop-blur-sm">
-            <div class="bg-white rounded-2xl w-full max-w-[340px] p-5 shadow-2xl">
-                <h3 class="text-lg font-bold text-gray-800 mb-3">Choose Background Color</h3>
-                <div class="grid grid-cols-2 gap-3 mb-4 max-h-[260px] overflow-y-auto pr-1">
-                    <button onclick="setTheme('#efeae2')" class="p-3 rounded-xl bg-[#efeae2] border border-gray-300 font-medium text-xs text-gray-800">WhatsApp Default</button>
-                    <button onclick="setTheme('#111b21')" class="p-3 rounded-xl bg-[#111b21] border border-gray-700 font-medium text-xs text-white">Dark Theme</button>
-                    <button onclick="setTheme('#0b141a')" class="p-3 rounded-xl bg-[#0b141a] border border-gray-700 font-medium text-xs text-white">Pitch Black</button>
-                    <button onclick="setTheme('#e2f4f3')" class="p-3 rounded-xl bg-[#e2f4f3] border border-gray-300 font-medium text-xs text-teal-900">Soft Mint</button>
-                    <button onclick="setTheme('#fce4ec')" class="p-3 rounded-xl bg-[#fce4ec] border border-gray-300 font-medium text-xs text-pink-900">Rose Pink</button>
-                    <button onclick="setTheme('#e8eaf6')" class="p-3 rounded-xl bg-[#e8eaf6] border border-gray-300 font-medium text-xs text-indigo-900">Lavender Blue</button>
-                    <button onclick="setTheme('#fff3e0')" class="p-3 rounded-xl bg-[#fff3e0] border border-gray-300 font-medium text-xs text-orange-900">Warm Peach</button>
-                    <button onclick="setTheme('#e0f7fa')" class="p-3 rounded-xl bg-[#e0f7fa] border border-gray-300 font-medium text-xs text-cyan-900">Sky Blue</button>
-                </div>
-                <button id="btn-close-theme" class="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-xl">Cancel</button>
             </div>
         </div>
 
@@ -217,7 +201,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, query, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, query, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDHUttmxneJt1KZCf3d-9lRqrdxLxx76C0",
@@ -237,23 +221,16 @@
         const appId = "my-whatsapp-clone";
         
         let myId = localStorage.getItem('whatsapp_my_id') || '';
-        let partnerId = ''; let currentRoomId = ''; let unsubscribeChat = null; let presenceInterval = null; let typingTimeout = null;
+        let partnerId = ''; let currentRoomId = ''; let unsubscribeChat = null; let presenceInterval = null;
         let localChatStore = []; let selectedMsgObj = null;
         let replyingToObj = null; let editingMsgObj = null;
 
-        let peerConnection = null; let localStream = null; let unsubscribeCallSignal = null;
-        const iceServers = {
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:global.stun.twilio.com:3478' }
-            ]
-        };
+        let peer = null; let mediaCall = null; let pendingCall = null; let localStream = null;
 
         const ui = {
             login: document.getElementById('login-screen'), chat: document.getElementById('chat-screen'),
             messages: document.getElementById('chat-messages'), dropdown: document.getElementById('chat-dropdown'),
             msgModal: document.getElementById('msg-action-modal'), confirmModal: document.getElementById('confirm-modal'),
-            themeModal: document.getElementById('theme-modal'),
             uploadBar: document.getElementById('upload-progress-bar'), uploadPercent: document.getElementById('upload-percent'),
             replyBox: document.getElementById('reply-preview-box'),
             viewerModal: document.getElementById('image-viewer-modal'), viewerImg: document.getElementById('viewer-img'), viewerDownload: document.getElementById('viewer-download-btn'),
@@ -265,8 +242,7 @@
         };
         const btn = {
             menu: document.getElementById('btn-chat-menu'), back: document.getElementById('btn-back'),
-            clear: document.getElementById('btn-clear-chat'), theme: document.getElementById('btn-change-theme'), closeTheme: document.getElementById('btn-close-theme'),
-            send: document.getElementById('send-btn'),
+            clear: document.getElementById('btn-clear-chat'), send: document.getElementById('send-btn'),
             delMe: document.getElementById('btn-delete-me'), delEveryone: document.getElementById('btn-delete-everyone'), 
             cancelAction: document.getElementById('btn-action-cancel'), reply: document.getElementById('btn-reply-msg'),
             edit: document.getElementById('btn-edit-msg'), cancelReply: document.getElementById('btn-cancel-reply'),
@@ -298,31 +274,10 @@
         }
         initAuth();
 
-        window.setTheme = function(color) {
-            ui.chat.style.backgroundColor = color;
-            localStorage.setItem('wa_chat_bg', color);
-            ui.themeModal.classList.add('hidden');
-            ui.dropdown.classList.add('hidden');
-        };
-        const savedBg = localStorage.getItem('wa_chat_bg');
-        if(savedBg) { ui.chat.style.backgroundColor = savedBg; }
-
-        btn.theme.addEventListener('click', () => { ui.dropdown.classList.add('hidden'); ui.themeModal.classList.remove('hidden'); });
-        btn.closeTheme.addEventListener('click', () => ui.themeModal.classList.add('hidden'));
-
         inputs.msg.addEventListener('input', function() {
             this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 112) + 'px'; 
             if(this.value.trim() === '') this.style.height = 'auto';
             setTimeout(() => ui.messages.scrollTop = ui.messages.scrollHeight, 10);
-
-            if(currentUserUid && currentRoomId) {
-                const typingRef = doc(db, 'artifacts', appId, 'public', 'data', 'typing_' + currentRoomId);
-                setDoc(typingRef, { [myId]: true, timestamp: Date.now() }, { merge: true });
-                clearTimeout(typingTimeout);
-                typingTimeout = setTimeout(() => {
-                    setDoc(typingRef, { [myId]: false }, { merge: true });
-                }, 2000);
-            }
         });
 
         document.getElementById('connect-btn').addEventListener('click', () => {
@@ -338,13 +293,13 @@
             }, 300);
             startChatSync();
             startPresenceSync();
-            listenForIncomingCalls();
+            initPeer(myId);
         });
 
         btn.back.addEventListener('click', () => {
             if(unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
             if(presenceInterval) { clearInterval(presenceInterval); presenceInterval = null; }
-            if(unsubscribeCallSignal) { unsubscribeCallSignal(); unsubscribeCallSignal = null; }
+            if(peer) { peer.destroy(); peer = null; }
             updateMyPresence(false);
             ui.chat.classList.add('hidden'); ui.login.classList.remove('hidden');
         });
@@ -360,84 +315,55 @@
         function startPresenceSync() {
             updateMyPresence(true);
             if(presenceInterval) clearInterval(presenceInterval);
-            presenceInterval = setInterval(() => updateMyPresence(true), 4000);
+            presenceInterval = setInterval(() => updateMyPresence(true), 5000);
 
             const partnerRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence_' + partnerId);
-            const typingRef = doc(db, 'artifacts', appId, 'public', 'data', 'typing_' + currentRoomId);
-
             onSnapshot(partnerRef, (docSnap) => {
                 const statusEl = document.getElementById('chat-status');
                 if(docSnap.exists()) {
                     const data = docSnap.data();
-                    const isOnline = data.online && (Date.now() - data.lastSeen < 12000);
-                    if(!statusEl.dataset.isTyping) {
-                        if(isOnline) {
-                            statusEl.textContent = "Online";
-                            statusEl.classList.add('font-bold', 'text-white');
+                    const isOnline = data.online && (Date.now() - data.lastSeen < 15000);
+                    if(isOnline) {
+                        statusEl.textContent = "Online";
+                        statusEl.classList.add('font-bold', 'text-white');
+                    } else {
+                        statusEl.classList.remove('font-bold', 'text-white');
+                        if(data.lastSeen) {
+                            const d = new Date(data.lastSeen);
+                            statusEl.textContent = `Last seen at ${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
                         } else {
-                            statusEl.classList.remove('font-bold', 'text-white');
-                            if(data.lastSeen) {
-                                const d = new Date(data.lastSeen);
-                                statusEl.textContent = `Last seen at ${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-                            } else {
-                                statusEl.textContent = "Offline";
-                            }
+                            statusEl.textContent = "Offline";
                         }
                     }
+                } else {
+                    statusEl.textContent = "Offline";
                 }
             });
+        }
 
-            onSnapshot(typingRef, (docSnap) => {
-                const statusEl = document.getElementById('chat-status');
-                if(docSnap.exists()) {
-                    const data = docSnap.data();
-                    const isPartnerTyping = data[partnerId] === true;
-                    if(isPartnerTyping) {
-                        statusEl.dataset.isTyping = "true";
-                        statusEl.textContent = "typing...";
-                        statusEl.classList.add('font-bold', 'text-green-300');
-                    } else {
-                        statusEl.dataset.isTyping = "";
-                        statusEl.classList.remove('font-bold', 'text-green-300');
-                    }
-                }
+        // --- PeerJS Calling Setup ---
+        function initPeer(id) {
+            if(peer) peer.destroy();
+            peer = new Peer(id, {
+                host: '0.peerjs.com',
+                port: 443,
+                secure: true,
+                debug: 1
             });
+            peer.on('open', () => console.log("Peer Connected"));
+            peer.on('call', handleIncomingCall);
         }
 
         async function getMediaStream(video = true) {
-            try { 
-                return await navigator.mediaDevices.getUserMedia({ 
-                    video: video ? { width: { ideal: 640 }, height: { ideal: 480 } } : false, 
-                    audio: true 
-                }); 
-            } catch (err) { 
-                alert("Camera/Microphone access blocked or unavailable."); 
-                return null; 
-            }
-        }
-
-        function createPeerConnection(isCaller, callId, withVideo) {
-            peerConnection = new RTCPeerConnection(iceServers);
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-            peerConnection.ontrack = (event) => {
-                document.getElementById('remote-video').srcObject = event.streams[0];
-                startCallTimer();
-            };
-
-            peerConnection.onicecandidate = async (event) => {
-                if (event.candidate) {
-                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'call_' + callId + '_candidates_' + myId, 'cand_' + Date.now()), event.candidate.toJSON());
-                }
-            };
-            return peerConnection;
+            try { return await navigator.mediaDevices.getUserMedia({ video: video, audio: true }); }
+            catch (err) { alert("Camera/Microphone access blocked or unavailable."); return null; }
         }
 
         btn.videoCall.addEventListener('click', () => initiateCall(true));
         btn.audioCall.addEventListener('click', () => initiateCall(false));
 
         async function initiateCall(withVideo) {
-            if (!partnerId) return;
+            if (!peer || !partnerId) return alert("Not connected to call network!");
             localStream = await getMediaStream(withVideo);
             if (!localStream) return;
 
@@ -451,100 +377,57 @@
             ui.chat.classList.add('hidden');
             ui.callScreen.classList.remove('hidden');
 
-            const callId = currentRoomId;
-            const pc = createPeerConnection(true, callId, withVideo);
-
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'active_call_' + partnerId), {
-                caller: myId,
-                type: withVideo ? 'video' : 'audio',
-                offer: { type: offer.type, sdp: offer.sdp },
-                callId: callId,
-                timestamp: Date.now()
-            });
-
-            unsubscribeCallSignal = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'call_answer_' + myId), async (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    if (data.answer && !pc.currentRemoteDescription) {
-                        await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-                    }
-                }
-            });
-
-            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'call_' + callId + '_candidates_' + partnerId), (snapshot) => {
-                snapshot.docChanges().forEach(async (change) => {
-                    if (change.type === 'added') {
-                        try { await pc.addIceCandidate(new RTCIceCandidate(change.doc.data())); } catch(e){}
-                    }
-                });
-            });
+            const call = peer.call(partnerId, localStream, { metadata: { type: withVideo ? 'video' : 'audio' } });
+            setupCallHandlers(call);
         }
 
-        let pendingCallData = null;
-        function listenForIncomingCalls() {
-            if(!myId) return;
-            onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'active_call_' + myId), (docSnap) => {
-                if(docSnap.exists()) {
-                    const data = docSnap.data();
-                    if(data && data.caller && data.caller !== myId && (Date.now() - data.timestamp < 30000)) {
-                        pendingCallData = data;
-                        document.getElementById('incoming-caller-id').textContent = data.caller;
-                        ui.incomingModal.classList.remove('hidden');
-                    }
-                }
-            });
+        function handleIncomingCall(call) {
+            if (mediaCall || pendingCall) { call.close(); return; }
+            pendingCall = call;
+            document.getElementById('incoming-caller-id').textContent = call.peer;
+            ui.incomingModal.classList.remove('hidden');
         }
 
         btn.acceptCall.addEventListener('click', async () => {
-            if (!pendingCallData) return;
-            const withVideo = pendingCallData.type === 'video';
-            localStream = await getMediaStream(withVideo);
+            if (!pendingCall) return;
+            const isVideo = pendingCall.metadata && pendingCall.metadata.type === 'video';
+            localStream = await getMediaStream(isVideo);
             
             if (localStream) {
                 document.getElementById('local-video').srcObject = localStream;
-                if(!withVideo) document.getElementById('local-video-container').classList.add('hidden');
+                if(!isVideo) document.getElementById('local-video-container').classList.add('hidden');
                 else document.getElementById('local-video-container').classList.remove('hidden');
+                
+                pendingCall.answer(localStream);
+                setupCallHandlers(pendingCall);
                 
                 ui.incomingModal.classList.add('hidden');
                 ui.chat.classList.add('hidden');
                 ui.callScreen.classList.remove('hidden');
-
-                const callId = pendingCallData.callId;
-                const pc = createPeerConnection(false, callId, withVideo);
-
-                await pc.setRemoteDescription(new RTCSessionDescription(pendingCallData.offer));
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'call_answer_' + pendingCallData.caller), {
-                    answer: { type: answer.type, sdp: answer.sdp }
-                });
-
-                onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'call_' + callId + '_candidates_' + pendingCallData.caller), (snapshot) => {
-                    snapshot.docChanges().forEach(async (change) => {
-                        if (change.type === 'added') {
-                            try { await pc.addIceCandidate(new RTCIceCandidate(change.doc.data())); } catch(e){}
-                        }
-                    });
-                });
-
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'active_call_' + myId)).catch(()=>{});
-                pendingCallData = null;
+                pendingCall = null;
+            } else {
+                pendingCall.close();
+                ui.incomingModal.classList.add('hidden');
+                pendingCall = null;
             }
         });
 
-        btn.rejectCall.addEventListener('click', async () => {
-            ui.incomingModal.classList.add('hidden');
-            if (pendingCallData) {
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'active_call_' + myId)).catch(()=>{});
-                pendingCallData = null;
-            }
+        btn.rejectCall.addEventListener('click', () => {
+            if (pendingCall) { pendingCall.close(); ui.incomingModal.classList.add('hidden'); pendingCall = null; }
         });
 
         let callInterval = null; let callSeconds = 0;
+        function setupCallHandlers(call) {
+            mediaCall = call;
+            document.getElementById('call-partner-display').textContent = call.peer;
+            call.on('stream', (remoteStream) => {
+                document.getElementById('remote-video').srcObject = remoteStream;
+                startCallTimer();
+            });
+            call.on('close', endCallUI);
+            call.on('error', endCallUI);
+        }
+
         function startCallTimer() {
             callSeconds = 0; clearInterval(callInterval);
             callInterval = setInterval(() => {
@@ -558,19 +441,17 @@
         function endCallUI() {
             clearInterval(callInterval);
             document.getElementById('call-duration').textContent = "Call Ended";
-            setTimeout(async () => {
-                if (peerConnection) { peerConnection.close(); peerConnection = null; }
+            setTimeout(() => {
+                if (mediaCall) { mediaCall.close(); mediaCall = null; }
                 if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-                if (unsubscribeCallSignal) { unsubscribeCallSignal(); unsubscribeCallSignal = null; }
                 document.getElementById('remote-video').srcObject = null;
                 document.getElementById('local-video').srcObject = null;
                 ui.callScreen.classList.add('hidden');
                 ui.chat.classList.remove('hidden');
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'active_call_' + myId)).catch(()=>{});
-            }, 1000);
+            }, 1200);
         }
 
-        btn.endCall.addEventListener('click', endCallUI);
+        btn.endCall.addEventListener('click', () => { if(mediaCall) mediaCall.close(); else endCallUI(); });
 
         function startChatSync() {
             if(!currentUserUid) return;
@@ -636,7 +517,7 @@
             });
         }
 
-        // --- FIXED SEND BUTTON LISTENER ---
+        // --- ACTIVE SEND BUTTON FIXED ---
         btn.send.addEventListener('click', (e) => {
             e.preventDefault();
             sendMessage();
@@ -654,9 +535,6 @@
             const text = overrideText !== '' ? overrideText : inputs.msg.value.trim();
             if (!text && !mediaData) return; 
             if (!currentUserUid) return alert("System not connected!");
-
-            const typingRef = doc(db, 'artifacts', appId, 'public', 'data', 'typing_' + currentRoomId);
-            setDoc(typingRef, { [myId]: false }, { merge: true });
 
             if (editingMsgObj) {
                 try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, editingMsgObj.id), { text: text, isEdited: true }); } catch(e) {}
@@ -680,18 +558,48 @@
 
         inputs.media.addEventListener('change', async (e) => {
             const file = e.target.files[0]; if(!file) return;
-            ui.uploadBar.classList.add('hidden');
-            if(file.size > 600 * 1024) {
-                inputs.media.value = '';
-                return alert("⚠️ File size is larger than 600KB! Please compress below 600KB.");
+
+            ui.uploadBar.classList.remove('hidden'); ui.uploadPercent.textContent = 'Compressing & Encrypting...';
+
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = async function() {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width; let height = img.height;
+                        const maxDim = 600;
+                        if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; }
+                        else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
+                        
+                        canvas.width = width; canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+                        const encryptedData = btoa(encodeURIComponent(compressedBase64));
+
+                        ui.uploadPercent.textContent = 'Sending...';
+                        await sendMessage('', { data: encryptedData, name: file.name, type: 'image', size: file.size });
+                        ui.uploadBar.classList.add('hidden'); inputs.media.value = '';
+                    }
+                }
+            } else {
+                if(file.size > 600 * 1024) {
+                    ui.uploadBar.classList.add('hidden');
+                    inputs.media.value = '';
+                    return alert("⚠️ File size is larger than 600KB! Please share videos via link or compress below 600KB.");
+                }
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = async function () {
+                    const encryptedData = btoa(encodeURIComponent(reader.result));
+                    await sendMessage('', { data: encryptedData, name: file.name, type: file.type.startsWith('video/') ? 'video' : 'document', size: file.size });
+                    ui.uploadBar.classList.add('hidden'); inputs.media.value = '';
+                };
             }
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = async function () {
-                const encryptedData = btoa(encodeURIComponent(reader.result));
-                await sendMessage('', { data: encryptedData, name: file.name, type: file.type.startsWith('image/') ? 'image' : (file.type.startsWith('video/') ? 'video' : 'document'), size: file.size });
-                inputs.media.value = '';
-            };
         });
 
         function renderMessageInDOM(msg, isSent) {
@@ -735,16 +643,21 @@
                     if (m.type === 'image') {
                         mediaHtml = `<div class="mb-1 rounded overflow-hidden relative group cursor-pointer" onclick="openImageViewer('${decodedBase64}')">
                             <img src="${decodedBase64}" class="max-w-full h-auto max-h-[260px] object-cover rounded">
+                            <div class="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition"><i class="ph ph-magnifying-glass-plus text-3xl text-white drop-shadow"></i></div>
                         </div>`;
                     } else if (m.type === 'video') {
-                        mediaHtml = `<div class="mb-1 rounded overflow-hidden"><video src="${decodedBase64}" controls class="max-w-full max-h-[260px] bg-black rounded"></video></div>`;
+                        mediaHtml = `<div class="mb-1 rounded overflow-hidden">
+                            <video src="${decodedBase64}" controls class="max-w-full max-h-[260px] bg-black rounded"></video>
+                        </div>`;
                     } else {
                         mediaHtml = `<div class="mb-1 mt-1 bg-black/5 p-2 rounded-lg flex items-center justify-between gap-2">
                             <div class="flex items-center gap-2 overflow-hidden"><i class="ph-fill ph-file text-xl text-red-500"></i><span class="text-xs truncate">${m.name}</span></div>
                             <a href="${decodedBase64}" download="${m.name}" class="p-1 text-gray-600 hover:text-wa-teal"><i class="ph-bold ph-download-simple text-lg"></i></a>
                         </div>`;
                     }
-                } catch(err) { mediaHtml = `<div class="text-xs text-red-500 italic">🔒 Encrypted file error</div>`; }
+                } catch(err) {
+                    mediaHtml = `<div class="text-xs text-red-500 italic">🔒 Encrypted file error</div>`;
+                }
             }
 
             const formattedText = msg.text ? msg.text.replace(/\n/g, '<br>') : '';
@@ -766,7 +679,9 @@
         }
 
         window.openImageViewer = function(url) {
-            ui.viewerImg.src = url; ui.viewerDownload.href = url; ui.viewerModal.classList.remove('hidden');
+            ui.viewerImg.src = url;
+            ui.viewerDownload.href = url;
+            ui.viewerModal.classList.remove('hidden');
         };
         btn.closeViewer.addEventListener('click', () => ui.viewerModal.classList.add('hidden'));
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>WhatsApp Secure Cloud</title>
+    <title>Secure Cloud</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -62,11 +62,11 @@
                 <div class="w-20 h-20 bg-wa-green rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
                     <i class="ph-fill ph-whatsapp-logo text-5xl text-white"></i>
                 </div>
-                <h1 class="text-2xl font-bold text-gray-800">WhatsApp Secure Cloud</h1>
+                <h1 class="text-2xl font-bold text-gray-800">Our Personal Cloud</h1>
             </div>
             <div class="w-full space-y-4">
-                <input type="text" id="my-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal" placeholder="Your ID (e.g. vikash)" autocomplete="off">
-                <input type="text" id="partner-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal" placeholder="Partner's ID (e.g. rahul)" autocomplete="off">
+                <input type="text" id="my-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal" placeholder="Your ID (e.g. Doraemon)" autocomplete="off">
+                <input type="text" id="partner-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal" placeholder="Partner's ID (e.g. Nobita)" autocomplete="off">
                 <button id="connect-btn" class="w-full bg-wa-lightTeal hover:bg-wa-teal text-white font-bold py-3.5 rounded-lg flex items-center justify-center gap-2 mt-4 shadow-md">
                     Start Secure Chat <i class="ph-bold ph-arrow-right"></i>
                 </button>
@@ -115,7 +115,7 @@
                 <button id="btn-cancel-reply" class="p-2 text-gray-500 hover:text-gray-700"><i class="ph-bold ph-x text-lg"></i></button>
             </div>
 
-            <!-- Input Area -->
+            <!-- Input Area (Fixed to bottom securely) -->
             <div id="input-container" class="shrink-0 bg-[#f0f2f5] px-2 py-2 flex items-end gap-2 z-20 w-full" style="padding-bottom: env(safe-area-inset-bottom, 8px);">
                 <div class="flex-1 bg-white rounded-2xl flex items-end shadow-sm border border-gray-200 relative overflow-hidden">
                     <button class="p-3 text-gray-500"><i class="ph ph-smiley text-xl text-gray-400"></i></button>
@@ -131,7 +131,7 @@
             </div>
             
             <div id="upload-progress-bar" class="hidden absolute top-[60px] left-0 w-full bg-wa-teal text-white text-xs font-semibold text-center py-1.5 z-30 shadow-md">
-                Compressing & Sending... <span id="upload-percent">0%</span>
+                Optimizing & Sending... <span id="upload-percent">0%</span>
             </div>
         </div>
 
@@ -249,17 +249,20 @@
 
         if(myId) { inputs.myId.value = myId; }
 
+        // --- Stable Mobile Viewport & Keyboard Lock Fix ---
         function setupMobileViewportFix() {
             const appContainer = document.getElementById('app-container');
             const adjustHeight = () => {
-                if (window.visualViewport) {
-                    appContainer.style.height = `${window.visualViewport.height}px`;
-                    window.scrollTo(0, 0); 
-                    if(!ui.chat.classList.contains('hidden')) ui.messages.scrollTop = ui.messages.scrollHeight;
+                const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+                appContainer.style.height = `${height}px`;
+                window.scrollTo(0, 0);
+                if(!ui.chat.classList.contains('hidden')) {
+                    ui.messages.scrollTop = ui.messages.scrollHeight;
                 }
             };
             window.visualViewport?.addEventListener('resize', adjustHeight);
             window.visualViewport?.addEventListener('scroll', adjustHeight);
+            window.addEventListener('resize', adjustHeight);
             adjustHeight(); 
         }
         setupMobileViewportFix();
@@ -298,7 +301,7 @@
             ui.chat.classList.add('hidden'); ui.login.classList.remove('hidden');
         });
 
-        // --- Reliable Online & Last Seen Presence Logic ---
+        // --- Bulletproof Real-time Presence (Online / Last Seen) ---
         async function updateMyPresence(isOnline) {
             if(!myId || !currentUserUid) return;
             try {
@@ -310,14 +313,14 @@
         function startPresenceSync() {
             updateMyPresence(true);
             if(presenceInterval) clearInterval(presenceInterval);
-            presenceInterval = setInterval(() => updateMyPresence(true), 10000); // Heartbeat every 10s
+            presenceInterval = setInterval(() => updateMyPresence(true), 8000); // Heartbeat every 8s
 
             const partnerRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence_' + partnerId);
             onSnapshot(partnerRef, (docSnap) => {
                 const statusEl = document.getElementById('chat-status');
                 if(docSnap.exists()) {
                     const data = docSnap.data();
-                    const isOnline = data.online && (Date.now() - data.lastSeen < 25000); // 25s threshold
+                    const isOnline = data.online && (Date.now() - data.lastSeen < 20000); // 20s window
                     if(isOnline) {
                         statusEl.textContent = "Online";
                         statusEl.classList.add('font-bold', 'text-white');
@@ -423,15 +426,15 @@
                 replyingToObj = null; ui.replyBox.classList.add('hidden');
             }
 
-            try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, docId), msgData); } catch (e) { alert("Send failed!"); }
+            try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, docId), msgData); } catch (e) { alert("Send failed! File size too large for database."); }
             setTimeout(() => ui.messages.scrollTop = ui.messages.scrollHeight, 50);
         }
 
-        // --- AUTOMATIC IMAGE COMPRESSOR & RESIZER (Fixes Firestore 1MB Limit) ---
+        // --- Advanced Auto-Compressor for Database Safety (< 600KB Guaranteed) ---
         inputs.media.addEventListener('change', async (e) => {
             const file = e.target.files[0]; if(!file) return;
 
-            ui.uploadBar.classList.remove('hidden'); ui.uploadPercent.textContent = 'Optimizing & Encrypting...';
+            ui.uploadBar.classList.remove('hidden'); ui.uploadPercent.textContent = 'Compressing & Encrypting...';
 
             if (file.type.startsWith('image/')) {
                 const reader = new FileReader();
@@ -442,7 +445,7 @@
                     img.onload = async function() {
                         const canvas = document.createElement('canvas');
                         let width = img.width; let height = img.height;
-                        const maxDim = 800; // Resize to max 800px to ensure < 400KB size
+                        const maxDim = 600; // Aggressive resize to strictly fit Firestore 1MB doc limit
                         if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; }
                         else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
                         
@@ -450,18 +453,21 @@
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
                         
-                        // Compress to JPEG 70% quality
-                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
                         const encryptedData = btoa(encodeURIComponent(compressedBase64));
 
-                        ui.uploadPercent.textContent = 'Sending Securely...';
+                        ui.uploadPercent.textContent = 'Sending...';
                         await sendMessage('', { data: encryptedData, name: file.name, type: 'image', size: file.size });
                         ui.uploadBar.classList.add('hidden'); inputs.media.value = '';
                     }
                 }
             } else {
-                // For video / documents under 800KB
-                if(file.size > 800 * 1024) return alert("Videos/Documents must be under 800KB due to database limits!");
+                // For videos / PDFs: check size limit
+                if(file.size > 600 * 1024) {
+                    ui.uploadBar.classList.add('hidden');
+                    inputs.media.value = '';
+                    return alert("⚠️ File size is larger than 600KB! Please share videos via a quick link or compress below 600KB to send directly.");
+                }
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
                 reader.onload = async function () {

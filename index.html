@@ -75,7 +75,7 @@
                 Start Call
             </button>
             
-            <!-- Modified: Increased minimum height to accommodate 2 lines of text -->
+            <!-- Status message container -->
             <div id="status-msg" class="text-center text-sm text-gray-400 mt-4 min-h-[40px]"></div>
         </div>
     </div>
@@ -264,7 +264,7 @@
         // Copy ID logic
         copyIdBtn.addEventListener('click', () => {
             const idToCopy = myIdDisplay.textContent;
-            if (idToCopy && idToCopy !== "Generating...") {
+            if (idToCopy && idToCopy !== "Generating..." && idToCopy !== "Blocked in Preview") {
                 // Secure clipboard API fallback for iframe/legacy
                 try {
                     navigator.clipboard.writeText(idToCopy).then(() => {

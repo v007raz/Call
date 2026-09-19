@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>WhatsApp Cloud Clone</title>
+    <title>WhatsApp Cloud</title>
     
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -25,9 +24,7 @@
         }
     </script>
     
-    <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <!-- PeerJS -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
     <style>
@@ -53,7 +50,6 @@
             background: linear-gradient(-135deg, #ffffff 0%, #ffffff 50%, transparent 50%, transparent);
         }
         .bubble-deleted::before { display: none !important; }
-        
         .swipe-transition { transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
     </style>
 </head>
@@ -109,7 +105,7 @@
                 </div>
             </div>
 
-            <!-- Reply UI Box -->
+            <!-- Reply Box -->
             <div id="reply-preview-box" class="hidden shrink-0 bg-white/90 backdrop-blur border-t border-gray-200 px-3 py-2 flex items-center gap-3 relative z-10 w-full rounded-t-xl mb-[-10px] pb-4">
                 <div class="w-1 bg-wa-teal h-full absolute left-0 top-0 rounded-tl-xl"></div>
                 <div class="flex-1 overflow-hidden ml-2">
@@ -129,7 +125,6 @@
                         <input type="file" id="media-input" style="display: none;" accept="image/*,video/*,audio/*,application/pdf">
                     </label>
                 </div>
-                <!-- Action Buttons: Changed from click to touchstart/mousedown to prevent blur (keyboard hide) -->
                 <button id="send-btn" class="w-12 h-12 rounded-full bg-wa-lightTeal hover:bg-wa-teal text-white flex items-center justify-center shrink-0 shadow-sm disabled:opacity-50">
                     <i class="ph-fill ph-paper-plane-right text-xl ml-1" id="send-icon"></i>
                 </button>
@@ -213,7 +208,6 @@
         let currentUserUid = null;
         const appId = "my-whatsapp-clone";
         
-        // Chat State
         let myId = localStorage.getItem('whatsapp_my_id') || '';
         let partnerId = ''; let currentRoomId = ''; let unsubscribeChat = null;
         let localChatStore = []; let selectedMsgObj = null;
@@ -240,16 +234,13 @@
 
         if(myId) { inputs.myId.value = myId; }
 
-        // --- Viewport & Keyboard Jump Fix ---
         function setupMobileViewportFix() {
             const appContainer = document.getElementById('app-container');
             const adjustHeight = () => {
                 if (window.visualViewport) {
                     appContainer.style.height = `${window.visualViewport.height}px`;
-                    window.scrollTo(0, 0); // Stops body shifting
-                    if(!ui.chat.classList.contains('hidden')) {
-                        ui.messages.scrollTop = ui.messages.scrollHeight;
-                    }
+                    window.scrollTo(0, 0); 
+                    if(!ui.chat.classList.contains('hidden')) ui.messages.scrollTop = ui.messages.scrollHeight;
                 }
             };
             window.visualViewport?.addEventListener('resize', adjustHeight);
@@ -259,7 +250,8 @@
         setupMobileViewportFix();
 
         async function initAuth() {
-            try { await signInAnonymously(auth); currentUserUid = auth.currentUser.uid; document.getElementById('login-status').textContent = "✅ Connected!"; } catch (err) {}
+            try { await signInAnonymously(auth); currentUserUid = auth.currentUser.uid; document.getElementById('login-status').textContent = "✅ Connected!"; } 
+            catch (err) { alert("Login Failed! Authentication is off in Firebase."); }
         }
         initAuth();
 
@@ -312,7 +304,9 @@
                 const existingIndex = localChatStore.findIndex(m => m.id === msg.id);
                 if (existingIndex === -1) {
                     localChatStore.push(msg); renderMessageInDOM(msg, isSentByMe); needsScroll = true;
-                    if (!isSentByMe && msg.status !== 'read') updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, msg.id), { status: 'read' });
+                    if (!isSentByMe && msg.status !== 'read') {
+                        try { updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, msg.id), { status: 'read' }); } catch(e){}
+                    }
                 } else {
                     const existingMsg = localChatStore[existingIndex];
                     if (existingMsg.status !== msg.status || existingMsg.isDeleted !== msg.isDeleted || existingMsg.text !== msg.text) {
@@ -323,73 +317,53 @@
             if(needsScroll) setTimeout(() => ui.messages.scrollTop = ui.messages.scrollHeight, 100);
         }
 
-        // --- Swipe, Reply & Edit Logic ---
         function activateReplyMode(msg) {
-            replyingToObj = msg; editingMsgObj = null;
-            ui.replyBox.classList.remove('hidden');
+            replyingToObj = msg; editingMsgObj = null; ui.replyBox.classList.remove('hidden');
             document.getElementById('reply-preview-sender').textContent = msg.senderId === myId ? 'You' : msg.senderId;
             document.getElementById('reply-preview-text').textContent = msg.text ? msg.text : (msg.media ? 'Media file' : '');
-            document.getElementById('send-icon').classList.replace('ph-check', 'ph-paper-plane-right');
-            inputs.msg.focus();
+            document.getElementById('send-icon').classList.replace('ph-check', 'ph-paper-plane-right'); inputs.msg.focus();
         }
         function activateEditMode(msg) {
-            editingMsgObj = msg; replyingToObj = null;
-            ui.replyBox.classList.add('hidden');
-            inputs.msg.value = msg.text;
-            inputs.msg.style.height = 'auto'; inputs.msg.style.height = Math.min(inputs.msg.scrollHeight, 112) + 'px'; 
-            document.getElementById('send-icon').classList.replace('ph-paper-plane-right', 'ph-check');
-            inputs.msg.focus();
+            editingMsgObj = msg; replyingToObj = null; ui.replyBox.classList.add('hidden');
+            inputs.msg.value = msg.text; inputs.msg.style.height = 'auto'; inputs.msg.style.height = Math.min(inputs.msg.scrollHeight, 112) + 'px'; 
+            document.getElementById('send-icon').classList.replace('ph-paper-plane-right', 'ph-check'); inputs.msg.focus();
         }
         btn.cancelReply.addEventListener('click', () => { replyingToObj = null; ui.replyBox.classList.add('hidden'); inputs.msg.focus(); });
 
-        // Add Touch Swipe Listener to bubbles
         function addSwipeListener(bubble, msg) {
             let startX = 0, currentX = 0;
             bubble.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, {passive: true});
             bubble.addEventListener('touchmove', (e) => {
                 currentX = e.touches[0].clientX - startX;
-                if (currentX > 0 && currentX < 80) { // Only right swipe for reply
-                    bubble.style.transform = `translateX(${currentX}px)`;
-                }
+                if (currentX > 0 && currentX < 80) bubble.style.transform = `translateX(${currentX}px)`;
             }, {passive: true});
             bubble.addEventListener('touchend', (e) => {
-                bubble.classList.add('swipe-transition');
-                bubble.style.transform = 'translateX(0px)';
+                bubble.classList.add('swipe-transition'); bubble.style.transform = 'translateX(0px)';
                 if (currentX > 50) activateReplyMode(msg);
-                setTimeout(() => bubble.classList.remove('swipe-transition'), 200);
-                currentX = 0;
+                setTimeout(() => bubble.classList.remove('swipe-transition'), 200); currentX = 0;
             });
         }
 
-        // --- Prevent Keyboard Disappear ---
-        // Using 'pointerdown' or 'mousedown/touchstart' + preventDefault stops the input from losing focus.
-        const sendEvent = (e) => {
-            e.preventDefault(); // Stop focus blur
-            sendMessage();
-            inputs.msg.focus(); // Keep keyboard open
-        };
-        btn.send.addEventListener('mousedown', sendEvent);
-        btn.send.addEventListener('touchstart', sendEvent, {passive: false});
-
+        btn.send.addEventListener('click', (e) => {
+            e.preventDefault(); sendMessage(); inputs.msg.focus(); 
+        });
         inputs.msg.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
 
         async function sendMessage(overrideText = '', mediaData = null) {
             const text = overrideText !== '' ? overrideText : inputs.msg.value.trim();
-            if (!text && !mediaData) return; if (!currentUserUid) return;
+            if (!text && !mediaData) return; if (!currentUserUid) return alert("System not connected to Cloud!");
 
-            // Handle Edit
             if (editingMsgObj) {
-                try {
-                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, editingMsgObj.id), { text: text, isEdited: true });
-                } catch(e) {}
+                try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, editingMsgObj.id), { text: text, isEdited: true }); } catch(e) { alert("Edit Failed!"); }
                 editingMsgObj = null; inputs.msg.value = ''; inputs.msg.style.height = 'auto';
-                document.getElementById('send-icon').classList.replace('ph-check', 'ph-paper-plane-right');
-                return;
+                document.getElementById('send-icon').classList.replace('ph-check', 'ph-paper-plane-right'); return;
             }
 
-            // Normal Send / Reply
             const timestamp = Date.now();
             const docId = 'msg_' + timestamp + '_' + Math.random().toString(36).substr(2, 5);
+            
+            // Backup text and clear UI immediately to feel fast
+            const backupText = inputs.msg.value;
             inputs.msg.value = ''; inputs.msg.style.height = 'auto';
 
             let msgData = { text: text, media: mediaData, senderId: myId, timestamp: timestamp, status: 'sent', isDeleted: false, deletedFor: [], isEdited: false };
@@ -398,20 +372,34 @@
                 replyingToObj = null; ui.replyBox.classList.add('hidden');
             }
 
-            try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, docId), msgData); } catch (e) {}
+            try { 
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, docId), msgData); 
+            } catch (e) { 
+                alert("❌ MESSAGE FAILED! Firebase Database Rules band hain. Please step 1 follow karein!"); 
+                inputs.msg.value = backupText; // Put text back if failed
+            }
             setTimeout(() => ui.messages.scrollTop = ui.messages.scrollHeight, 50);
         }
 
-        // Media Upload
         inputs.media.addEventListener('change', async (e) => {
             const file = e.target.files[0]; if(!file) return;
-            inputs.msg.disabled = true; btn.send.disabled = true; ui.uploadBar.classList.remove('hidden'); ui.uploadPercent.textContent = '0%';
-            const storageRef = ref(storage, `chat_media/${currentRoomId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`);
+            if(file.size > 20 * 1024 * 1024) return alert("File is too large (Max 20MB)!");
+
+            inputs.msg.disabled = true; btn.send.disabled = true; 
+            ui.uploadBar.classList.remove('hidden'); ui.uploadPercent.textContent = '0%';
+            
+            let safeName = file.name ? file.name.replace(/[^a-zA-Z0-9.]/g, '_') : 'file';
+            const storageRef = ref(storage, `chat_media/${currentRoomId}/${Date.now()}_${safeName}`);
             const uploadTask = uploadBytesResumable(storageRef, file);
+
             uploadTask.on('state_changed',
                 (snap) => { ui.uploadPercent.textContent = Math.round((snap.bytesTransferred / snap.totalBytes) * 100) + '%'; },
-                (err) => { inputs.msg.disabled = false; btn.send.disabled = false; ui.uploadBar.classList.add('hidden'); },
+                (err) => { 
+                    alert("❌ UPLOAD BLOCKED! Firebase Storage Rules band hain. Please step 2 follow karein!"); 
+                    inputs.msg.disabled = false; btn.send.disabled = false; ui.uploadBar.classList.add('hidden'); inputs.media.value = '';
+                },
                 async () => {
+                    ui.uploadPercent.textContent = 'Processing...';
                     const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
                     let fileType = 'document';
                     if(file.type.startsWith('image/')) fileType = 'image'; else if(file.type.startsWith('video/')) fileType = 'video';
@@ -425,15 +413,12 @@
             const wrapper = document.createElement('div'); wrapper.id = 'wrap_' + msg.id; wrapper.className = `flex w-full ${isSent ? 'justify-end' : 'justify-start'} mb-1 relative`;
             const bubble = document.createElement('div'); bubble.id = 'bubble_' + msg.id;
             
-            addSwipeListener(bubble, msg); // Attach swipe logic
+            addSwipeListener(bubble, msg); 
             
             bubble.addEventListener('click', (e) => {
                 if (e.target.closest('a') || e.target.tagName === 'VIDEO' || e.target.closest('.reply-block')) return;
                 selectedMsgObj = msg; ui.msgModal.classList.remove('hidden');
-                
-                // Show/hide Edit button
                 if (isSent && !msg.isDeleted && !msg.media) btn.edit.classList.remove('hidden'); else btn.edit.classList.add('hidden');
-                // Show/hide Delete Everyone
                 if (isSent && !msg.isDeleted) btn.delEveryone.classList.remove('hidden'); else btn.delEveryone.classList.add('hidden');
             });
             wrapper.appendChild(bubble); ui.messages.appendChild(wrapper); updateMessageDOM(msg, isSent);
@@ -447,8 +432,7 @@
                 return;
             }
 
-            bubble.className = `relative max-w-[80%] px-2 py-1.5 rounded-lg shadow-sm text-[15px] text-gray-800 break-words active:opacity-90 transition-opacity
-                ${isSent ? 'bg-wa-sent rounded-tr-none bubble-tail-sent' : 'bg-wa-rcvd rounded-tl-none bubble-tail-rcvd'}`;
+            bubble.className = `relative max-w-[80%] px-2 py-1.5 rounded-lg shadow-sm text-[15px] text-gray-800 break-words active:opacity-90 transition-opacity ${isSent ? 'bg-wa-sent rounded-tr-none bubble-tail-sent' : 'bg-wa-rcvd rounded-tl-none bubble-tail-rcvd'}`;
 
             let replyHtml = '';
             if (msg.replyTo) {
@@ -474,26 +458,28 @@
             }
             
             const textPadding = msg.text ? 'pb-3 px-1' : 'pb-4'; 
+            let timeStr = new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            if(timeStr === 'Invalid Date') timeStr = '';
+            
             bubble.innerHTML = `${replyHtml}${mediaHtml}${msg.text ? `<div class="${textPadding}">${formattedText}</div>` : `<div class="pb-3"></div>`}
                 <div class="absolute bottom-1 right-2 flex items-center gap-1 opacity-90 z-10 ${msg.media && !msg.text ? 'bg-white/60 px-1 rounded-full' : ''}">
                     ${msg.isEdited ? '<span class="text-[10px] text-gray-400 italic">edited</span>' : ''}
-                    <span class="text-[10px] text-gray-500 font-medium">${new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span><span>${ticksHtml}</span>
+                    <span class="text-[10px] text-gray-500 font-medium">${timeStr}</span><span>${ticksHtml}</span>
                 </div>`;
         }
 
-        // Modal Action Listeners
         btn.cancelAction.addEventListener('click', () => { ui.msgModal.classList.add('hidden'); selectedMsgObj = null; });
         btn.reply.addEventListener('click', () => { ui.msgModal.classList.add('hidden'); activateReplyMode(selectedMsgObj); });
         btn.edit.addEventListener('click', () => { ui.msgModal.classList.add('hidden'); activateEditMode(selectedMsgObj); });
         
         btn.delMe.addEventListener('click', () => {
             if(!selectedMsgObj) return; ui.msgModal.classList.add('hidden');
-            updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, selectedMsgObj.id), { deletedFor: [...(selectedMsgObj.deletedFor || []), myId] });
+            try { updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, selectedMsgObj.id), { deletedFor: [...(selectedMsgObj.deletedFor || []), myId] }); } catch(e){}
             document.getElementById('wrap_' + selectedMsgObj.id)?.remove();
         });
         btn.delEveryone.addEventListener('click', () => {
             if(!selectedMsgObj) return; ui.msgModal.classList.add('hidden');
-            updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, selectedMsgObj.id), { isDeleted: true });
+            try { updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, selectedMsgObj.id), { isDeleted: true }); } catch(e){}
         });
         document.getElementById('btn-chat-menu').addEventListener('click', () => ui.dropdown.classList.toggle('hidden'));
     </script>

@@ -62,11 +62,11 @@
                 <div class="w-20 h-20 bg-wa-green rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
                     <i class="ph-fill ph-whatsapp-logo text-5xl text-white"></i>
                 </div>
-                <h1 class="text-2xl font-bold text-gray-800">Our Presonal Cloud</h1>
+                <h1 class="text-2xl font-bold text-gray-800">WhatsApp Secure Cloud</h1>
             </div>
             <div class="w-full space-y-4">
-                <input type="text" id="my-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal" placeholder="Your ID (e.g. Nobita)" autocomplete="off">
-                <input type="text" id="partner-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal" placeholder="Partner's ID (e.g. Doraemon)" autocomplete="off">
+                <input type="text" id="my-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal" placeholder="Your ID (e.g. vikash)" autocomplete="off">
+                <input type="text" id="partner-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal" placeholder="Partner's ID (e.g. rahul)" autocomplete="off">
                 <button id="connect-btn" class="w-full bg-wa-lightTeal hover:bg-wa-teal text-white font-bold py-3.5 rounded-lg flex items-center justify-center gap-2 mt-4 shadow-md">
                     Start Secure Chat <i class="ph-bold ph-arrow-right"></i>
                 </button>
@@ -83,7 +83,7 @@
                     <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden"><i class="ph-fill ph-user text-2xl text-gray-500"></i></div>
                     <div class="ml-1 flex flex-col justify-center">
                         <h2 id="chat-partner-name" class="font-semibold text-[17px] leading-tight">Partner</h2>
-                        <p id="chat-status" class="text-[11px] text-wa-bg opacity-90">Connecting...</p>
+                        <p id="chat-status" class="text-[11px] text-wa-bg opacity-90">Offline</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-1">
@@ -131,15 +131,15 @@
             </div>
             
             <div id="upload-progress-bar" class="hidden absolute top-[60px] left-0 w-full bg-wa-teal text-white text-xs font-semibold text-center py-1.5 z-30 shadow-md">
-                Processing Media... <span id="upload-percent">0%</span>
+                Compressing & Sending... <span id="upload-percent">0%</span>
             </div>
         </div>
 
-        <!-- Fullscreen Image Viewer Modal (Zoom & Download) -->
+        <!-- Fullscreen Image Viewer Modal -->
         <div id="image-viewer-modal" class="hidden absolute inset-0 bg-black/95 z-[100] flex flex-col items-center justify-center p-2">
             <button id="close-viewer" class="absolute top-4 right-4 text-white bg-white/20 hover:bg-white/40 p-2 rounded-full z-10"><i class="ph-bold ph-x text-2xl"></i></button>
             <div class="flex-1 w-full flex items-center justify-center overflow-auto">
-                <img id="viewer-img" src="" class="max-w-full max-h-full object-contain cursor-zoom-in transition-transform duration-200" alt="Full Image">
+                <img id="viewer-img" src="" class="max-w-full max-h-full object-contain transition-transform duration-200" alt="Full Image">
             </div>
             <div class="p-4 w-full flex justify-center">
                 <a id="viewer-download-btn" href="" download="whatsapp_image.jpg" class="bg-wa-lightTeal hover:bg-wa-teal text-white px-6 py-2.5 rounded-full font-semibold flex items-center gap-2 shadow-lg">
@@ -201,7 +201,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, query, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, query, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDHUttmxneJt1KZCf3d-9lRqrdxLxx76C0",
@@ -298,7 +298,7 @@
             ui.chat.classList.add('hidden'); ui.login.classList.remove('hidden');
         });
 
-        // --- Online & Last Seen Presence Logic ---
+        // --- Reliable Online & Last Seen Presence Logic ---
         async function updateMyPresence(isOnline) {
             if(!myId || !currentUserUid) return;
             try {
@@ -309,14 +309,15 @@
 
         function startPresenceSync() {
             updateMyPresence(true);
-            presenceInterval = setInterval(() => updateMyPresence(true), 15000); // Heartbeat every 15s
+            if(presenceInterval) clearInterval(presenceInterval);
+            presenceInterval = setInterval(() => updateMyPresence(true), 10000); // Heartbeat every 10s
 
             const partnerRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence_' + partnerId);
             onSnapshot(partnerRef, (docSnap) => {
                 const statusEl = document.getElementById('chat-status');
                 if(docSnap.exists()) {
                     const data = docSnap.data();
-                    const isOnline = data.online && (Date.now() - data.lastSeen < 30000); // 30s timeout
+                    const isOnline = data.online && (Date.now() - data.lastSeen < 25000); // 25s threshold
                     if(isOnline) {
                         statusEl.textContent = "Online";
                         statusEl.classList.add('font-bold', 'text-white');
@@ -385,7 +386,6 @@
         }
         btn.cancelReply.addEventListener('click', () => { replyingToObj = null; ui.replyBox.classList.add('hidden'); inputs.msg.focus(); });
 
-        // --- Left & Right Swipe to Reply ---
         function addSwipeListener(bubble, msg) {
             let startX = 0, currentX = 0;
             bubble.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, {passive: true});
@@ -427,28 +427,49 @@
             setTimeout(() => ui.messages.scrollTop = ui.messages.scrollHeight, 50);
         }
 
-        // --- Client-side Encryption & Size Buffer for Media (Supports up to 5MB) ---
+        // --- AUTOMATIC IMAGE COMPRESSOR & RESIZER (Fixes Firestore 1MB Limit) ---
         inputs.media.addEventListener('change', async (e) => {
             const file = e.target.files[0]; if(!file) return;
-            if(file.size > 5 * 1024 * 1024) return alert("File size should be under 5MB for direct cloud transmission!");
 
-            ui.uploadBar.classList.remove('hidden'); ui.uploadPercent.textContent = 'Encrypting...';
+            ui.uploadBar.classList.remove('hidden'); ui.uploadPercent.textContent = 'Optimizing & Encrypting...';
 
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = async function () {
-                const base64Data = reader.result;
-                const encryptedData = btoa(encodeURIComponent(base64Data));
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = async function() {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width; let height = img.height;
+                        const maxDim = 800; // Resize to max 800px to ensure < 400KB size
+                        if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; }
+                        else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
+                        
+                        canvas.width = width; canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // Compress to JPEG 70% quality
+                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                        const encryptedData = btoa(encodeURIComponent(compressedBase64));
 
-                ui.uploadPercent.textContent = 'Sending...';
-                await sendMessage('', {
-                    data: encryptedData, name: file.name,
-                    type: file.type.startsWith('image/') ? 'image' : (file.type.startsWith('video/') ? 'video' : 'document'),
-                    size: file.size
-                });
-
-                ui.uploadBar.classList.add('hidden'); inputs.media.value = '';
-            };
+                        ui.uploadPercent.textContent = 'Sending Securely...';
+                        await sendMessage('', { data: encryptedData, name: file.name, type: 'image', size: file.size });
+                        ui.uploadBar.classList.add('hidden'); inputs.media.value = '';
+                    }
+                }
+            } else {
+                // For video / documents under 800KB
+                if(file.size > 800 * 1024) return alert("Videos/Documents must be under 800KB due to database limits!");
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = async function () {
+                    const encryptedData = btoa(encodeURIComponent(reader.result));
+                    await sendMessage('', { data: encryptedData, name: file.name, type: file.type.startsWith('video/') ? 'video' : 'document', size: file.size });
+                    ui.uploadBar.classList.add('hidden'); inputs.media.value = '';
+                };
+            }
         });
 
         function renderMessageInDOM(msg, isSent) {
@@ -527,7 +548,6 @@
                 </div>`;
         }
 
-        // --- Fullscreen Zoom Viewer Handlers ---
         window.openImageViewer = function(url) {
             ui.viewerImg.src = url;
             ui.viewerDownload.href = url;

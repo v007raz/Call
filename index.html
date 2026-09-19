@@ -48,7 +48,6 @@
         .bubble-deleted::before { display: none !important; }
         .swipe-transition { transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
         
-        /* Fix for send button click & touch events */
         #send-btn { pointer-events: auto !important; z-index: 30; cursor: pointer; }
         #send-btn * { pointer-events: none; }
     </style>
@@ -126,7 +125,7 @@
                         <input type="file" id="media-input" style="display: none;" accept="image/*,video/*,audio/*,application/pdf">
                     </label>
                 </div>
-                <button id="send-btn" class="w-12 h-12 rounded-full bg-wa-lightTeal hover:bg-wa-teal text-white flex items-center justify-center shrink-0 shadow-sm disabled:opacity-50">
+                <button id="send-btn" class="w-12 h-12 rounded-full bg-wa-lightTeal hover:bg-wa-teal text-white flex items-center justify-center shrink-0 shadow-sm">
                     <i class="ph-fill ph-paper-plane-right text-xl ml-1" id="send-icon"></i>
                 </button>
             </div>
@@ -146,7 +145,7 @@
                     <button onclick="setTheme('#0b141a')" class="p-3 rounded-xl bg-[#0b141a] border border-gray-700 font-medium text-xs text-white">Pitch Black</button>
                     <button onclick="setTheme('#e2f4f3')" class="p-3 rounded-xl bg-[#e2f4f3] border border-gray-300 font-medium text-xs text-teal-900">Soft Mint</button>
                     <button onclick="setTheme('#fce4ec')" class="p-3 rounded-xl bg-[#fce4ec] border border-gray-300 font-medium text-xs text-pink-900">Rose Pink</button>
-                    <button onclick="setTheme('#e8eaf6')" class="p-3 rounded-xl bg-[#e8eaf6] border border-gray-300 font-medium text-xs text-indigo-900">Lavender Blue</button>
+                    <button onclick="setTheme('#e8eaf6')" class="p-3 rounded-xl bg-[#e8eaf6] border border-gray-700 font-medium text-xs text-indigo-900">Lavender Blue</button>
                 </div>
                 <button id="btn-close-theme" class="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-xl">Cancel</button>
             </div>
@@ -243,7 +242,6 @@
         let localChatStore = []; let selectedMsgObj = null;
         let replyingToObj = null; let editingMsgObj = null;
 
-        // WebRTC Direct Calling variables
         let peerConnection = null; let localStream = null; let unsubscribeCallSignal = null;
         const iceServers = {
             iceServers: [
@@ -280,20 +278,6 @@
         };
 
         if(myId) { inputs.myId.value = myId; }
-
-        function setupMobileViewportFix() {
-            const appContainer = document.getElementById('app-container');
-            const adjustHeight = () => {
-                const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-                appContainer.style.height = `${height}px`;
-                window.scrollTo(0, 0);
-            };
-            window.visualViewport?.addEventListener('resize', adjustHeight);
-            window.visualViewport?.addEventListener('scroll', adjustHeight);
-            window.addEventListener('resize', adjustHeight);
-            adjustHeight(); 
-        }
-        setupMobileViewportFix();
 
         async function initAuth() {
             try { await signInAnonymously(auth); currentUserUid = auth.currentUser.uid; document.getElementById('login-status').textContent = "✅ Connected!"; } 
@@ -407,7 +391,6 @@
             });
         }
 
-        // --- DIRECT FIREBASE WEBRTC CALLING SYSTEM ---
         async function getMediaStream(video = true) {
             try { 
                 return await navigator.mediaDevices.getUserMedia({ 
@@ -422,7 +405,6 @@
 
         function createPeerConnection(isCaller, callId, withVideo) {
             peerConnection = new RTCPeerConnection(iceServers);
-
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
             peerConnection.ontrack = (event) => {
@@ -435,7 +417,6 @@
                     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'call_' + callId + '_candidates_' + myId, 'cand_' + Date.now()), event.candidate.toJSON());
                 }
             };
-
             return peerConnection;
         }
 
@@ -459,20 +440,14 @@
 
             const callId = currentRoomId;
             const pc = createPeerConnection(true, callId, withVideo);
-
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
 
-            // Send Offer via Firebase
             await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'active_call_' + partnerId), {
-                caller: myId,
-                type: withVideo ? 'video' : 'audio',
-                offer: { type: offer.type, sdp: offer.sdp },
-                callId: callId,
-                timestamp: Date.now()
+                caller: myId, type: withVideo ? 'video' : 'audio',
+                offer: { type: offer.type, sdp: offer.sdp }, callId: callId, timestamp: Date.now()
             });
 
-            // Listen for Answer
             unsubscribeCallSignal = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'call_answer_' + myId), async (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
@@ -482,7 +457,6 @@
                 }
             });
 
-            // Listen for remote candidates
             onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'call_' + callId + '_candidates_' + partnerId), (snapshot) => {
                 snapshot.docChanges().forEach(async (change) => {
                     if (change.type === 'added') {
@@ -539,8 +513,6 @@
                         }
                     });
                 });
-
-                // Clear incoming call doc
                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'active_call_' + myId)).catch(()=>{});
                 pendingCallData = null;
             }
@@ -565,7 +537,7 @@
             }, 1000);
         }
 
-        function endCallUI() {
+        btn.endCall.addEventListener('click', () => {
             clearInterval(callInterval);
             document.getElementById('call-duration').textContent = "Call Ended";
             setTimeout(async () => {
@@ -578,11 +550,8 @@
                 ui.chat.classList.remove('hidden');
                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'active_call_' + myId)).catch(()=>{});
             }, 1000);
-        }
+        });
 
-        btn.endCall.addEventListener('click', endCallUI);
-
-        // --- Chat Sync & Messaging ---
         function startChatSync() {
             if(!currentUserUid) return;
             Array.from(ui.messages.children).forEach(child => { if(!child.querySelector('.ph-lock-key')) child.remove(); });
@@ -647,7 +616,7 @@
             });
         }
 
-        // --- FIXED SEND BUTTON LISTENERS ---
+        // --- WORKING SEND BUTTON LISTENERS ---
         const handleSendAction = (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -683,16 +652,18 @@
                 replyingToObj = null; ui.replyBox.classList.add('hidden');
             }
 
-            try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, docId), msgData); } catch (e) { alert("Send failed! File size too large."); }
+            try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, docId), msgData); } catch (e) { alert("Send failed! File size might be too large."); }
             setTimeout(() => ui.messages.scrollTop = ui.messages.scrollHeight, 50);
         }
 
         inputs.media.addEventListener('change', async (e) => {
             const file = e.target.files[0]; if(!file) return;
             ui.uploadBar.classList.add('hidden');
-            if(file.size > 600 * 1024) {
+            
+            // Limit increased to ~950KB for better media support
+            if(file.size > 950 * 1024) {
                 inputs.media.value = '';
-                return alert("⚠️ File size is larger than 600KB! Please compress below 600KB.");
+                return alert("⚠️ File size is larger than 950KB! Please select a smaller file.");
             }
             const reader = new FileReader();
             reader.readAsDataURL(file);

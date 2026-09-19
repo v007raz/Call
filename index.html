@@ -275,7 +275,7 @@ initAuth();
 async function setPresence(online){
   if(!currentUserUid||!myId)return;
   try{
-    await setDoc(doc(db,"artifacts",APP_ID,"public","data","presence_"+myId),{
+    await setDoc(doc(db,"artifacts",APP_ID,"public","data","presence",myId),{
       online,lastSeen:Date.now(),uid:currentUserUid
     },{merge:true});
   }catch(e){console.error("Presence error",e);}
@@ -294,7 +294,7 @@ function startPresence(){
   presenceTimer=setInterval(()=>setPresence(true),5000);
 
   unsubscribePresence=onSnapshot(
-    doc(db,"artifacts",APP_ID,"public","data","presence_"+partnerId),
+    doc(db,"artifacts",APP_ID,"public","data","presence",partnerId),
     snap=>{
       if(!snap.exists()){ui.status.textContent="Offline";return}
       const d=snap.data(),online=d.online&&Date.now()-d.lastSeen<15000;
@@ -306,7 +306,7 @@ function startPresence(){
   );
 
   unsubscribeTyping=onSnapshot(
-    doc(db,"artifacts",APP_ID,"public","data","typing_"+currentRoomId),
+    doc(db,"artifacts",APP_ID,"public","data","typing",currentRoomId),
     snap=>{
       const d=snap.exists()?snap.data():{};
       if(d[partnerId]===true){
@@ -479,7 +479,7 @@ async function sendMessage(){
   if(!text)return;
   sending=true;btn.send.disabled=true;
   try{
-    await setDoc(doc(db,"artifacts",APP_ID,"public","data","typing_"+currentRoomId),{[myId]:false},{merge:true});
+    await setDoc(doc(db,"artifacts",APP_ID,"public","data","typing",currentRoomId),{[myId]:false},{merge:true});
     if(editingMsgObj){
       await updateDoc(doc(db,"artifacts",APP_ID,"public","data","chat_"+currentRoomId,editingMsgObj.id),{text,isEdited:true});
       editingMsgObj=null;
@@ -543,9 +543,9 @@ inp.msg.addEventListener("input",()=>{
   inp.msg.style.height="auto";
   if(inp.msg.value)inp.msg.style.height=Math.min(inp.msg.scrollHeight,112)+"px";
   if(currentUserUid&&currentRoomId){
-    setDoc(doc(db,"artifacts",APP_ID,"public","data","typing_"+currentRoomId),{[myId]:true},{merge:true}).catch(()=>{});
+    setDoc(doc(db,"artifacts",APP_ID,"public","data","typing",currentRoomId),{[myId]:true},{merge:true}).catch(()=>{});
     clearTimeout(typingTimer);
-    typingTimer=setTimeout(()=>setDoc(doc(db,"artifacts",APP_ID,"public","data","typing_"+currentRoomId),{[myId]:false},{merge:true}).catch(()=>{}),1500);
+    typingTimer=setTimeout(()=>setDoc(doc(db,"artifacts",APP_ID,"public","data","typing",currentRoomId),{[myId]:false},{merge:true}).catch(()=>{}),1500);
   }
 });
 inp.msg.addEventListener("keydown",e=>{
@@ -650,7 +650,7 @@ function makePeer(isCaller){
     if(!e.candidate||!callId)return;
     const owner=isCaller?myId:partnerId;
     const id="cand_"+Date.now()+"_"+Math.random().toString(36).slice(2,7);
-    try{await setDoc(doc(db,"artifacts",APP_ID,"public","data","call_"+callId+"_candidates_"+owner,id),e.candidate.toJSON())}
+    try{await setDoc(doc(db,"artifacts",APP_ID,"public","data","call_candidates",callId,owner,id),e.candidate.toJSON())}
     catch(err){console.error("ICE write",err)}
   };
   return peerConnection;
@@ -658,7 +658,7 @@ function makePeer(isCaller){
 
 function watchCandidates(owner){
   return onSnapshot(
-    collection(db,"artifacts",APP_ID,"public","data","call_"+callId+"_candidates_"+owner),
+    collection(db,"artifacts",APP_ID,"public","data","call_candidates",callId,owner),
     snap=>snap.docChanges().forEach(async ch=>{
       if(ch.type==="added"&&peerConnection){
         try{await peerConnection.addIceCandidate(new RTCIceCandidate(ch.doc.data()))}catch(e){console.warn("ICE add",e)}
@@ -682,10 +682,10 @@ async function initiateCall(withVideo){
   const offer=await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
   try{
-    await setDoc(doc(db,"artifacts",APP_ID,"public","data","active_call_"+partnerId),{
+    await setDoc(doc(db,"artifacts",APP_ID,"public","data","active_calls",partnerId),{
       caller:myId,type:callType,offer:{type:offer.type,sdp:offer.sdp},callId,timestamp:Date.now()
     });
-    callAnswerUnsub=onSnapshot(doc(db,"artifacts",APP_ID,"public","data","call_answer_"+myId),async snap=>{
+    callAnswerUnsub=onSnapshot(doc(db,"artifacts",APP_ID,"public","data","call_answers",myId),async snap=>{
       if(!snap.exists()||!peerConnection)return;
       const d=snap.data();
       if(d.callId===callId&&d.answer&&!peerConnection.currentRemoteDescription){
@@ -701,7 +701,7 @@ btn.audioCall.addEventListener("click",()=>initiateCall(false));
 
 function listenIncomingCalls(){
   if(unsubscribeIncoming)unsubscribeIncoming();
-  unsubscribeIncoming=onSnapshot(doc(db,"artifacts",APP_ID,"public","data","active_call_"+myId),snap=>{
+  unsubscribeIncoming=onSnapshot(doc(db,"artifacts",APP_ID,"public","data","active_calls",myId),snap=>{
     if(!snap.exists())return;
     const d=snap.data();
     if(d.caller&&d.caller!==myId&&Date.now()-d.timestamp<30000){
@@ -728,18 +728,18 @@ btn.accept.addEventListener("click",async()=>{
     await peerConnection.setRemoteDescription(new RTCSessionDescription(d.offer));
     const answer=await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
-    await setDoc(doc(db,"artifacts",APP_ID,"public","data","call_answer_"+d.caller),{
+    await setDoc(doc(db,"artifacts",APP_ID,"public","data","call_answers",d.caller),{
       callId,answer:{type:answer.type,sdp:answer.sdp},timestamp:Date.now()
     });
     calleeCandidateUnsub=watchCandidates(d.caller);
-    await deleteDoc(doc(db,"artifacts",APP_ID,"public","data","active_call_"+myId)).catch(()=>{});
+    await deleteDoc(doc(db,"artifacts",APP_ID,"public","data","active_calls",myId)).catch(()=>{});
     pendingCallData=null;
   }catch(e){showError("Accept call failed",e);cleanupCall()}
 });
 
 btn.reject.addEventListener("click",async()=>{
   ui.incoming.classList.add("hidden");
-  if(pendingCallData)await deleteDoc(doc(db,"artifacts",APP_ID,"public","data","active_call_"+myId)).catch(()=>{});
+  if(pendingCallData)await deleteDoc(doc(db,"artifacts",APP_ID,"public","data","active_calls",myId)).catch(()=>{});
   pendingCallData=null;
 });
 
@@ -747,7 +747,7 @@ btn.end.addEventListener(async()=>{
   if(myId&&partnerId){
     await setDoc(doc(db,"artifacts",APP_ID,"public","data","call_end_"+partnerId),{callId:callId,timestamp:Date.now()},{merge:true}).catch(()=>{});
   }
-  if(callId)await deleteDoc(doc(db,"artifacts",APP_ID,"public","data","active_call_"+myId)).catch(()=>{});
+  if(callId)await deleteDoc(doc(db,"artifacts",APP_ID,"public","data","active_calls",myId)).catch(()=>{});
   cleanupCall();
 });
 

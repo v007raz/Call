@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Peer2Peer Video Call</title>
+    
+    <!-- Tailwind CSS for modern, responsive, dark-themed styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Phosphor Icons for modern UI controls -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- PeerJS for WebRTC Peer-to-Peer connection -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            /* Prevent pull-to-refresh on mobile */
+            overscroll-behavior-y: none;
+        }
+        
+        /* Glassmorphism utility for floating UI */
+        .glass {
+            background: rgba(31, 41, 55, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Smooth transitions */
+        .transition-all-200 {
+            transition: all 0.2s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 h-screen w-screen overflow-hidden flex flex-col relative">
+
+    <!-- Setup Screen (Initial State) -->
+    <div id="setup-screen" class="flex-1 flex flex-col items-center justify-center p-6 z-10 transition-opacity duration-500">
+        <div class="max-w-md w-full bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl">
+            <div class="text-center mb-8">
+                <i class="ph ph-video-camera text-5xl text-blue-500 mb-2"></i>
+                <h1 class="text-2xl font-bold">Secure Video Call</h1>
+                <p class="text-sm text-gray-400 mt-2">Peer-to-peer connection for 2 people.</p>
+            </div>
+
+            <!-- Local ID Display -->
+            <div class="mb-6">
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Your Peer ID</label>
+                <div class="flex items-center gap-2 bg-gray-950 border border-gray-800 rounded-xl p-3">
+                    <span id="my-id-display" class="font-mono text-sm flex-1 truncate text-gray-300">Generating...</span>
+                    <button id="copy-id-btn" class="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-all-200" title="Copy to clipboard">
+                        <i class="ph ph-copy text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="relative flex py-4 items-center">
+                <div class="flex-grow border-t border-gray-800"></div>
+                <span class="flex-shrink-0 mx-4 text-gray-500 text-sm">Start a connection</span>
+                <div class="flex-grow border-t border-gray-800"></div>
+            </div>
+
+            <!-- Remote ID Input -->
+            <div class="mb-6">
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Partner's Peer ID</label>
+                <input type="text" id="remote-id-input" placeholder="Enter remote ID here" 
+                       class="w-full bg-gray-950 border border-gray-800 rounded-xl p-4 font-mono text-sm focus:outline-none focus:border-blue-500 transition-all-200 placeholder-gray-600">
+            </div>
+
+            <button id="call-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition-all-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                <i class="ph ph-phone-call text-xl"></i>
+                Start Call
+            </button>
+            
+            <!-- Modified: Increased minimum height to accommodate 2 lines of text -->
+            <div id="status-msg" class="text-center text-sm text-gray-400 mt-4 min-h-[40px]"></div>
+        </div>
+    </div>
+
+    <!-- Call Screen (Hidden Initially) -->
+    <div id="call-screen" class="hidden absolute inset-0 bg-black z-20 flex items-center justify-center">
+        
+        <!-- Remote Video (Main) -->
+        <video id="remote-video" autoplay playsinline class="w-full h-full object-cover"></video>
+        
+        <!-- Local Video (Picture in Picture) -->
+        <!-- Muted to prevent feedback loop for the local user -->
+        <div class="absolute bottom-24 right-4 md:bottom-8 md:right-8 w-32 md:w-48 aspect-[3/4] bg-gray-800 rounded-xl overflow-hidden shadow-2xl border-2 border-gray-700 z-30 transition-all-200 hover:scale-105">
+            <video id="local-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+            <div class="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-[10px] font-semibold tracking-wider">YOU</div>
+        </div>
+
+        <!-- Call Controls -->
+        <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 glass rounded-2xl p-2 flex items-center gap-2 md:gap-4 z-40">
+            <button id="toggle-mic-btn" class="p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all-200" title="Toggle Microphone">
+                <i class="ph ph-microphone text-xl" id="mic-icon"></i>
+            </button>
+            <button id="toggle-video-btn" class="p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all-200" title="Toggle Camera">
+                <i class="ph ph-video-camera text-xl" id="video-icon"></i>
+            </button>
+            <button id="end-call-btn" class="p-4 rounded-xl bg-red-600 hover:bg-red-500 transition-all-200" title="End Call">
+                <i class="ph ph-phone-disconnect text-xl text-white"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Incoming Call Modal -->
+    <div id="incoming-call-modal" class="hidden absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl animate-pulse">
+            <div class="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="ph ph-phone-ringing text-4xl text-blue-500"></i>
+            </div>
+            <h2 class="text-xl font-bold mb-2">Incoming Call</h2>
+            <p class="text-sm text-gray-400 mb-6 font-mono truncate px-4" id="caller-id-display">Caller ID</p>
+            
+            <div class="flex gap-4">
+                <button id="reject-call-btn" class="flex-1 bg-red-600 hover:bg-red-500 py-3 rounded-xl font-semibold transition-all-200 flex items-center justify-center gap-2">
+                    <i class="ph ph-x"></i> Decline
+                </button>
+                <button id="accept-call-btn" class="flex-1 bg-green-600 hover:bg-green-500 py-3 rounded-xl font-semibold transition-all-200 flex items-center justify-center gap-2">
+                    <i class="ph ph-phone text-white"></i> Accept
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global error handler to catch WebSocket security blocks in the preview Canvas
+        window.addEventListener('unhandledrejection', event => {
+            if (event.reason && event.reason.toString().includes('is not allowed in Canvas')) {
+                const statusElement = document.getElementById('status-msg');
+                if (statusElement) {
+                    statusElement.innerHTML = "⚠️ WebSockets are blocked in this preview.<br/>The app will work normally once hosted on GitHub Pages.";
+                    statusElement.classList.remove('text-gray-400', 'text-red-500');
+                    statusElement.classList.add('text-orange-400');
+                }
+                const callBtnElement = document.getElementById('call-btn');
+                if (callBtnElement) {
+                    callBtnElement.disabled = true;
+                }
+                const idDisplay = document.getElementById('my-id-display');
+                if (idDisplay) {
+                    idDisplay.textContent = "Blocked in Preview";
+                    idDisplay.classList.add('text-orange-400');
+                }
+                event.preventDefault(); // Prevent standard console error crash
+            }
+        });
+
+        // DOM Elements
+        const setupScreen = document.getElementById('setup-screen');
+        const callScreen = document.getElementById('call-screen');
+        const myIdDisplay = document.getElementById('my-id-display');
+        const copyIdBtn = document.getElementById('copy-id-btn');
+        const remoteIdInput = document.getElementById('remote-id-input');
+        const callBtn = document.getElementById('call-btn');
+        const statusMsg = document.getElementById('status-msg');
+        
+        const localVideo = document.getElementById('local-video');
+        const remoteVideo = document.getElementById('remote-video');
+        
+        const toggleMicBtn = document.getElementById('toggle-mic-btn');
+        const micIcon = document.getElementById('mic-icon');
+        const toggleVideoBtn = document.getElementById('toggle-video-btn');
+        const videoIcon = document.getElementById('video-icon');
+        const endCallBtn = document.getElementById('end-call-btn');
+        
+        const incomingCallModal = document.getElementById('incoming-call-modal');
+        const callerIdDisplay = document.getElementById('caller-id-display');
+        const acceptCallBtn = document.getElementById('accept-call-btn');
+        const rejectCallBtn = document.getElementById('reject-call-btn');
+
+        // State Variables
+        let peer = null;
+        let localStream = null;
+        let currentCall = null;
+        let pendingIncomingCall = null;
+        
+        let isAudioMuted = false;
+        let isVideoOff = false;
+        let peerId = null;
+
+        // Initialize App
+        async function init() {
+            try {
+                // Request Camera and Microphone permissions
+                statusMsg.textContent = "Requesting camera & mic permissions...";
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                
+                // Show local video on setup screen (hidden logic) and call screen
+                localVideo.srcObject = localStream;
+                
+                initPeer();
+
+            } catch (err) {
+                console.error("Media Error:", err);
+                statusMsg.textContent = "Failed to access Camera/Microphone.";
+                statusMsg.classList.add('text-red-500');
+                callBtn.disabled = true;
+            }
+        }
+
+        function initPeer() {
+            statusMsg.textContent = "Connecting to peer network...";
+            statusMsg.classList.remove('text-red-500');
+
+            // Initialize PeerJS with explicit debug level to help diagnose issues
+            peer = new Peer({
+                debug: 2, // 2 = warnings & errors
+                config: {'iceServers': [
+                    { url: 'stun:stun.l.google.com:19302' }, // Use Google's free STUN
+                    { url: 'stun:stun1.l.google.com:19302' }
+                ]}
+            }); 
+
+            peer.on('open', (id) => {
+                peerId = id;
+                myIdDisplay.textContent = id;
+                statusMsg.textContent = "Ready to connect.";
+                callBtn.disabled = false;
+            });
+
+            peer.on('error', (err) => {
+                console.error("PeerJS Error:", err);
+                // Don't show 'peer-unavailable' error as a critical failure on the main screen 
+                // if we are just trying to connect.
+                if (err.type !== 'peer-unavailable') {
+                    statusMsg.textContent = `Network Error. Reconnecting...`;
+                    statusMsg.classList.add('text-red-500');
+                    callBtn.disabled = true;
+                    // Attempt to reconnect if the connection to the server drops
+                    if (peer && !peer.destroyed) {
+                         setTimeout(() => {
+                             if(peer.disconnected) {
+                                 console.log("Attempting to reconnect...");
+                                 peer.reconnect();
+                             }
+                         }, 3000);
+                    }
+                } else if(statusMsg.textContent === "Calling...") {
+                     statusMsg.textContent = "User not found or offline.";
+                     setTimeout(() => { statusMsg.textContent = "Ready to connect."; }, 3000);
+                }
+            });
+
+            peer.on('disconnected', () => {
+                console.warn("Disconnected from PeerJS server.");
+                statusMsg.textContent = "Disconnected. Trying to reconnect...";
+                statusMsg.classList.add('text-red-500');
+                callBtn.disabled = true;
+                // Workaround for peerjs reconnection bug
+                peer.id = peerId;
+                peer._lastServerId = peerId;
+                peer.reconnect();
+            });
+
+            // Listen for incoming calls
+            peer.on('call', handleIncomingCall);
+        }
+
+        // Copy ID logic
+        copyIdBtn.addEventListener('click', () => {
+            const idToCopy = myIdDisplay.textContent;
+            if (idToCopy && idToCopy !== "Generating...") {
+                // Secure clipboard API fallback for iframe/legacy
+                try {
+                    navigator.clipboard.writeText(idToCopy).then(() => {
+                        const originalHtml = copyIdBtn.innerHTML;
+                        copyIdBtn.innerHTML = '<i class="ph ph-check text-lg text-green-400"></i>';
+                        setTimeout(() => copyIdBtn.innerHTML = originalHtml, 2000);
+                    });
+                } catch(e) {
+                    // Fallback
+                    const textArea = document.createElement("textarea");
+                    textArea.value = idToCopy;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(textArea);
+                    const originalHtml = copyIdBtn.innerHTML;
+                    copyIdBtn.innerHTML = '<i class="ph ph-check text-lg text-green-400"></i>';
+                    setTimeout(() => copyIdBtn.innerHTML = originalHtml, 2000);
+                }
+            }
+        });
+
+        // Initiate a call
+        callBtn.addEventListener('click', () => {
+            const remoteId = remoteIdInput.value.trim();
+            if (!remoteId) {
+                statusMsg.textContent = "Please enter a valid remote ID.";
+                return;
+            }
+            if (remoteId === myIdDisplay.textContent) {
+                statusMsg.textContent = "You cannot call yourself.";
+                return;
+            }
+            if (!peer || peer.disconnected) {
+                 statusMsg.textContent = "Not connected to network. Wait...";
+                 return;
+            }
+            
+            statusMsg.textContent = "Calling...";
+            const call = peer.call(remoteId, localStream);
+            if(call) {
+                setupCallEventHandlers(call);
+            } else {
+                 statusMsg.textContent = "Failed to initiate call.";
+                 setTimeout(() => { statusMsg.textContent = "Ready to connect."; }, 3000);
+            }
+        });
+
+        // Handle incoming calls
+        function handleIncomingCall(call) {
+            // If already in a call, reject automatically
+            if (currentCall) {
+                call.close();
+                return;
+            }
+            
+            pendingIncomingCall = call;
+            callerIdDisplay.textContent = call.peer;
+            incomingCallModal.classList.remove('hidden');
+        }
+
+        // Accept Call
+        acceptCallBtn.addEventListener('click', () => {
+            if (pendingIncomingCall) {
+                pendingIncomingCall.answer(localStream); // Answer with our local stream
+                setupCallEventHandlers(pendingIncomingCall);
+                incomingCallModal.classList.add('hidden');
+                pendingIncomingCall = null;
+            }
+        });
+
+        // Reject Call
+        rejectCallBtn.addEventListener('click', () => {
+            if (pendingIncomingCall) {
+                pendingIncomingCall.close();
+                incomingCallModal.classList.add('hidden');
+                pendingIncomingCall = null;
+            }
+        });
+
+        // Common Call Event Handlers (used for caller and receiver)
+        function setupCallEventHandlers(call) {
+            currentCall = call;
+            
+            call.on('stream', (remoteStream) => {
+                // When we receive the remote stream, play it and switch UI
+                remoteVideo.srcObject = remoteStream;
+                switchToCallScreen();
+            });
+
+            call.on('close', () => {
+                endCall();
+            });
+
+            call.on('error', (err) => {
+                console.error("Call Error:", err);
+                endCall();
+            });
+        }
+
+        // UI Switching
+        function switchToCallScreen() {
+            setupScreen.classList.add('hidden');
+            callScreen.classList.remove('hidden');
+        }
+
+        function switchToSetupScreen() {
+            callScreen.classList.add('hidden');
+            setupScreen.classList.remove('hidden');
+            statusMsg.textContent = "Call ended.";
+            setTimeout(() => { if(statusMsg.textContent === "Call ended.") statusMsg.textContent = "Ready to connect."; }, 3000);
+        }
+
+        // End Call Function
+        function endCall() {
+            if (currentCall) {
+                currentCall.close();
+                currentCall = null;
+            }
+            if (remoteVideo.srcObject) {
+                remoteVideo.srcObject.getTracks().forEach(track => track.stop());
+                remoteVideo.srcObject = null;
+            }
+            switchToSetupScreen();
+        }
+
+        endCallBtn.addEventListener('click', endCall);
+
+        // Media Controls (Toggle Mic)
+        toggleMicBtn.addEventListener('click', () => {
+            if (localStream) {
+                isAudioMuted = !isAudioMuted;
+                localStream.getAudioTracks()[0].enabled = !isAudioMuted;
+                
+                if (isAudioMuted) {
+                    micIcon.classList.remove('ph-microphone');
+                    micIcon.classList.add('ph-microphone-slash', 'text-red-500');
+                    toggleMicBtn.classList.add('bg-gray-700');
+                } else {
+                    micIcon.classList.remove('ph-microphone-slash', 'text-red-500');
+                    micIcon.classList.add('ph-microphone');
+                    toggleMicBtn.classList.remove('bg-gray-700');
+                }
+            }
+        });
+
+        // Media Controls (Toggle Camera)
+        toggleVideoBtn.addEventListener('click', () => {
+            if (localStream) {
+                isVideoOff = !isVideoOff;
+                localStream.getVideoTracks()[0].enabled = !isVideoOff;
+                
+                if (isVideoOff) {
+                    videoIcon.classList.remove('ph-video-camera');
+                    videoIcon.classList.add('ph-video-camera-slash', 'text-red-500');
+                    toggleVideoBtn.classList.add('bg-gray-700');
+                } else {
+                    videoIcon.classList.remove('ph-video-camera-slash', 'text-red-500');
+                    videoIcon.classList.add('ph-video-camera');
+                    toggleVideoBtn.classList.remove('bg-gray-700');
+                }
+            }
+        });
+
+        // Start initialization on window load
+        window.onload = init;
+
+    </script>
+</body>
+</html>

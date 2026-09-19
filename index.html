@@ -62,11 +62,11 @@
                 <div class="w-20 h-20 bg-wa-green rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
                     <i class="ph-fill ph-whatsapp-logo text-5xl text-white"></i>
                 </div>
-                <h1 class="text-2xl font-bold text-gray-800">Our Presional Cloud</h1>
+                <h1 class="text-2xl font-bold text-gray-800">Our Presonal Cloud</h1>
             </div>
             <div class="w-full space-y-4">
-                <input type="text" id="my-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal" placeholder="Your ID (e.g. Doraemon)" autocomplete="off">
-                <input type="text" id="partner-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal" placeholder="Partner's ID (e.g. Nobita)" autocomplete="off">
+                <input type="text" id="my-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal" placeholder="Your ID (e.g. Nobita)" autocomplete="off">
+                <input type="text" id="partner-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal" placeholder="Partner's ID (e.g. Doraemon)" autocomplete="off">
                 <button id="connect-btn" class="w-full bg-wa-lightTeal hover:bg-wa-teal text-white font-bold py-3.5 rounded-lg flex items-center justify-center gap-2 mt-4 shadow-md">
                     Start Secure Chat <i class="ph-bold ph-arrow-right"></i>
                 </button>
@@ -83,7 +83,7 @@
                     <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden"><i class="ph-fill ph-user text-2xl text-gray-500"></i></div>
                     <div class="ml-1 flex flex-col justify-center">
                         <h2 id="chat-partner-name" class="font-semibold text-[17px] leading-tight">Partner</h2>
-                        <p id="chat-status" class="text-[11px] text-wa-bg opacity-90">🔒 E2E Encrypted Active</p>
+                        <p id="chat-status" class="text-[11px] text-wa-bg opacity-90">Connecting...</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-1">
@@ -100,7 +100,7 @@
             <div id="chat-messages" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2 relative z-0 pb-4">
                 <div class="flex justify-center mb-4 mt-2">
                     <div class="bg-[#FFEECD] text-gray-700 text-[11px] px-4 py-1.5 rounded-lg text-center shadow-sm">
-                        <i class="ph-fill ph-lock-key inline align-middle mr-1"></i> Messages & Media are End-to-End Encrypted.
+                        <i class="ph-fill ph-lock-key inline align-middle mr-1"></i> End-to-End Encrypted & Secure.
                     </div>
                 </div>
             </div>
@@ -131,7 +131,20 @@
             </div>
             
             <div id="upload-progress-bar" class="hidden absolute top-[60px] left-0 w-full bg-wa-teal text-white text-xs font-semibold text-center py-1.5 z-30 shadow-md">
-                Encrypting & Sending Media... <span id="upload-percent">0%</span>
+                Processing Media... <span id="upload-percent">0%</span>
+            </div>
+        </div>
+
+        <!-- Fullscreen Image Viewer Modal (Zoom & Download) -->
+        <div id="image-viewer-modal" class="hidden absolute inset-0 bg-black/95 z-[100] flex flex-col items-center justify-center p-2">
+            <button id="close-viewer" class="absolute top-4 right-4 text-white bg-white/20 hover:bg-white/40 p-2 rounded-full z-10"><i class="ph-bold ph-x text-2xl"></i></button>
+            <div class="flex-1 w-full flex items-center justify-center overflow-auto">
+                <img id="viewer-img" src="" class="max-w-full max-h-full object-contain cursor-zoom-in transition-transform duration-200" alt="Full Image">
+            </div>
+            <div class="p-4 w-full flex justify-center">
+                <a id="viewer-download-btn" href="" download="whatsapp_image.jpg" class="bg-wa-lightTeal hover:bg-wa-teal text-white px-6 py-2.5 rounded-full font-semibold flex items-center gap-2 shadow-lg">
+                    <i class="ph-bold ph-download-simple text-xl"></i> Download Image
+                </a>
             </div>
         </div>
 
@@ -188,7 +201,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, query, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, query, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDHUttmxneJt1KZCf3d-9lRqrdxLxx76C0",
@@ -208,7 +221,7 @@
         const appId = "my-whatsapp-clone";
         
         let myId = localStorage.getItem('whatsapp_my_id') || '';
-        let partnerId = ''; let currentRoomId = ''; let unsubscribeChat = null;
+        let partnerId = ''; let currentRoomId = ''; let unsubscribeChat = null; let presenceInterval = null;
         let localChatStore = []; let selectedMsgObj = null;
         let replyingToObj = null; let editingMsgObj = null;
 
@@ -217,7 +230,8 @@
             messages: document.getElementById('chat-messages'), dropdown: document.getElementById('chat-dropdown'),
             msgModal: document.getElementById('msg-action-modal'), confirmModal: document.getElementById('confirm-modal'),
             uploadBar: document.getElementById('upload-progress-bar'), uploadPercent: document.getElementById('upload-percent'),
-            replyBox: document.getElementById('reply-preview-box')
+            replyBox: document.getElementById('reply-preview-box'),
+            viewerModal: document.getElementById('image-viewer-modal'), viewerImg: document.getElementById('viewer-img'), viewerDownload: document.getElementById('viewer-download-btn')
         };
         const inputs = {
             myId: document.getElementById('my-id-input'), partnerId: document.getElementById('partner-id-input'),
@@ -229,7 +243,8 @@
             delMe: document.getElementById('btn-delete-me'), delEveryone: document.getElementById('btn-delete-everyone'), 
             cancelAction: document.getElementById('btn-action-cancel'), reply: document.getElementById('btn-reply-msg'),
             edit: document.getElementById('btn-edit-msg'), cancelReply: document.getElementById('btn-cancel-reply'),
-            confirmClear: document.getElementById('btn-confirm-clear'), cancelClear: document.getElementById('btn-confirm-cancel')
+            confirmClear: document.getElementById('btn-confirm-clear'), cancelClear: document.getElementById('btn-confirm-cancel'),
+            closeViewer: document.getElementById('close-viewer')
         };
 
         if(myId) { inputs.myId.value = myId; }
@@ -273,12 +288,52 @@
                 document.getElementById('chat-partner-name').textContent = partnerId.charAt(0).toUpperCase() + partnerId.slice(1);
             }, 300);
             startChatSync();
+            startPresenceSync();
         });
 
         btn.back.addEventListener('click', () => {
             if(unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
+            if(presenceInterval) { clearInterval(presenceInterval); presenceInterval = null; }
+            updateMyPresence(false);
             ui.chat.classList.add('hidden'); ui.login.classList.remove('hidden');
         });
+
+        // --- Online & Last Seen Presence Logic ---
+        async function updateMyPresence(isOnline) {
+            if(!myId || !currentUserUid) return;
+            try {
+                const ref = doc(db, 'artifacts', appId, 'public', 'data', 'presence_' + myId);
+                await setDoc(ref, { online: isOnline, lastSeen: Date.now() }, { merge: true });
+            } catch(e){}
+        }
+
+        function startPresenceSync() {
+            updateMyPresence(true);
+            presenceInterval = setInterval(() => updateMyPresence(true), 15000); // Heartbeat every 15s
+
+            const partnerRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence_' + partnerId);
+            onSnapshot(partnerRef, (docSnap) => {
+                const statusEl = document.getElementById('chat-status');
+                if(docSnap.exists()) {
+                    const data = docSnap.data();
+                    const isOnline = data.online && (Date.now() - data.lastSeen < 30000); // 30s timeout
+                    if(isOnline) {
+                        statusEl.textContent = "Online";
+                        statusEl.classList.add('font-bold', 'text-white');
+                    } else {
+                        statusEl.classList.remove('font-bold', 'text-white');
+                        if(data.lastSeen) {
+                            const d = new Date(data.lastSeen);
+                            statusEl.textContent = `Last seen at ${d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                        } else {
+                            statusEl.textContent = "Offline";
+                        }
+                    }
+                } else {
+                    statusEl.textContent = "Offline";
+                }
+            });
+        }
 
         function startChatSync() {
             if(!currentUserUid) return;
@@ -320,7 +375,7 @@
         function activateReplyMode(msg) {
             replyingToObj = msg; editingMsgObj = null; ui.replyBox.classList.remove('hidden');
             document.getElementById('reply-preview-sender').textContent = msg.senderId === myId ? 'You' : msg.senderId;
-            document.getElementById('reply-preview-text').textContent = msg.text ? msg.text : (msg.media ? 'Encrypted Media' : '');
+            document.getElementById('reply-preview-text').textContent = msg.text ? msg.text : (msg.media ? 'Secure Media' : '');
             document.getElementById('send-icon').classList.replace('ph-check', 'ph-paper-plane-right'); inputs.msg.focus();
         }
         function activateEditMode(msg) {
@@ -372,9 +427,10 @@
             setTimeout(() => ui.messages.scrollTop = ui.messages.scrollHeight, 50);
         }
 
+        // --- Client-side Encryption & Size Buffer for Media (Supports up to 5MB) ---
         inputs.media.addEventListener('change', async (e) => {
             const file = e.target.files[0]; if(!file) return;
-            if(file.size > 5 * 1024 * 1024) return alert("File size should be under 5MB!");
+            if(file.size > 5 * 1024 * 1024) return alert("File size should be under 5MB for direct cloud transmission!");
 
             ui.uploadBar.classList.remove('hidden'); ui.uploadPercent.textContent = 'Encrypting...';
 
@@ -384,7 +440,7 @@
                 const base64Data = reader.result;
                 const encryptedData = btoa(encodeURIComponent(base64Data));
 
-                ui.uploadPercent.textContent = 'Sending Securely...';
+                ui.uploadPercent.textContent = 'Sending...';
                 await sendMessage('', {
                     data: encryptedData, name: file.name,
                     type: file.type.startsWith('image/') ? 'image' : (file.type.startsWith('video/') ? 'video' : 'document'),
@@ -433,9 +489,21 @@
                 try {
                     const decodedBase64 = decodeURIComponent(atob(msg.media.data));
                     const m = msg.media;
-                    if (m.type === 'image') mediaHtml = `<div class="mb-1 rounded overflow-hidden relative"><img src="${decodedBase64}" class="max-w-full h-auto max-h-[300px] rounded"></div>`;
-                    else if (m.type === 'video') mediaHtml = `<div class="mb-1 rounded"><video src="${decodedBase64}" controls class="max-w-full max-h-[300px] bg-black rounded"></video></div>`;
-                    else mediaHtml = `<div class="mb-1 mt-1 bg-black/5 p-2 rounded-lg flex items-center gap-2"><i class="ph-fill ph-file text-xl text-red-500"></i><span class="text-xs truncate">${m.name}</span></div>`;
+                    if (m.type === 'image') {
+                        mediaHtml = `<div class="mb-1 rounded overflow-hidden relative group cursor-pointer" onclick="openImageViewer('${decodedBase64}')">
+                            <img src="${decodedBase64}" class="max-w-full h-auto max-h-[260px] object-cover rounded">
+                            <div class="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition"><i class="ph ph-magnifying-glass-plus text-3xl text-white drop-shadow"></i></div>
+                        </div>`;
+                    } else if (m.type === 'video') {
+                        mediaHtml = `<div class="mb-1 rounded overflow-hidden">
+                            <video src="${decodedBase64}" controls class="max-w-full max-h-[260px] bg-black rounded"></video>
+                        </div>`;
+                    } else {
+                        mediaHtml = `<div class="mb-1 mt-1 bg-black/5 p-2 rounded-lg flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2 overflow-hidden"><i class="ph-fill ph-file text-xl text-red-500"></i><span class="text-xs truncate">${m.name}</span></div>
+                            <a href="${decodedBase64}" download="${m.name}" class="p-1 text-gray-600 hover:text-wa-teal"><i class="ph-bold ph-download-simple text-lg"></i></a>
+                        </div>`;
+                    }
                 } catch(err) {
                     mediaHtml = `<div class="text-xs text-red-500 italic">🔒 Encrypted file error</div>`;
                 }
@@ -459,6 +527,14 @@
                 </div>`;
         }
 
+        // --- Fullscreen Zoom Viewer Handlers ---
+        window.openImageViewer = function(url) {
+            ui.viewerImg.src = url;
+            ui.viewerDownload.href = url;
+            ui.viewerModal.classList.remove('hidden');
+        };
+        btn.closeViewer.addEventListener('click', () => ui.viewerModal.classList.add('hidden'));
+
         btn.cancelAction.addEventListener('click', () => { ui.msgModal.classList.add('hidden'); selectedMsgObj = null; });
         btn.reply.addEventListener('click', () => { ui.msgModal.classList.add('hidden'); activateReplyMode(selectedMsgObj); });
         btn.edit.addEventListener('click', () => { ui.msgModal.classList.add('hidden'); activateEditMode(selectedMsgObj); });
@@ -473,7 +549,6 @@
             try { updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, selectedMsgObj.id), { isDeleted: true }); } catch(e){}
         });
 
-        // --- FIXED CLEAR CHAT LOGIC ---
         btn.clear.addEventListener('click', () => { ui.dropdown.classList.add('hidden'); ui.confirmModal.classList.remove('hidden'); });
         btn.cancelClear.addEventListener('click', () => ui.confirmModal.classList.add('hidden'));
         

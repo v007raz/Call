@@ -25,7 +25,6 @@
     </script>
     
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <!-- PeerJS Updated to stable cloud host -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
     <style>
@@ -117,7 +116,7 @@
             </div>
 
             <!-- Input Area -->
-            <div id="input-container" class="shrink-0 bg-[#f0f2f5] px-2 py-2 flex items-end gap-2 z-20 w-full" style="padding-bottom: env(safe-area-inset-bottom, 8px);">
+            <div id="input-container" class="shrink-0 bg-[#f0f2f5] px-2 py-2 flex items-end gap-2 z-20 w-full" style="padding-bottom: max(env(safe-area-inset-bottom), 8px);">
                 <div class="flex-1 bg-white rounded-2xl flex items-end shadow-sm border border-gray-200 relative overflow-hidden">
                     <button class="p-3 text-gray-500"><i class="ph ph-smiley text-xl text-gray-400"></i></button>
                     <textarea id="msg-input" rows="1" class="flex-1 bg-transparent py-3 focus:outline-none resize-none max-h-28 text-[15px] text-gray-800" placeholder="Message"></textarea>
@@ -227,7 +226,6 @@
         let localChatStore = []; let selectedMsgObj = null;
         let replyingToObj = null; let editingMsgObj = null;
 
-        // PeerJS variables
         let peer = null; let mediaCall = null; let pendingCall = null; let localStream = null;
 
         const ui = {
@@ -257,6 +255,7 @@
 
         if(myId) { inputs.myId.value = myId; }
 
+        // --- Perfect Viewport and Keyboard Alignment Fix ---
         function setupMobileViewportFix() {
             const appContainer = document.getElementById('app-container');
             const adjustHeight = () => {
@@ -350,7 +349,6 @@
         // --- PeerJS Calling Setup ---
         function initPeer(id) {
             if(peer) peer.destroy();
-            // Using PeerJS official free cloud server configuration
             peer = new Peer(id, {
                 host: '0.peerjs.com',
                 port: 443,

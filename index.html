@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>P2P WhatsApp Clone</title>
     
     <!-- Tailwind CSS -->
@@ -40,6 +40,8 @@
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             overscroll-behavior-y: none;
+            /* Fix for mobile navigation bar */
+            height: 100dvh; 
         }
         
         /* Custom scrollbar for chat */
@@ -73,11 +75,21 @@
             height: 20px;
             background: linear-gradient(-135deg, #ffffff 0%, #ffffff 50%, transparent 50%, transparent);
         }
+        
+        /* Stop tail rendering if message is deleted */
+        .bubble-deleted::before {
+            display: none !important;
+        }
+
+        /* Safe area handling for input area on modern phones */
+        .safe-bottom {
+            padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+        }
     </style>
 </head>
-<body class="bg-gray-100 h-screen w-screen overflow-hidden flex items-center justify-center">
+<body class="bg-gray-100 w-screen overflow-hidden flex items-center justify-center">
 
-    <!-- App Container (Limits width on desktop for mobile feel) -->
+    <!-- App Container -->
     <div class="w-full h-full max-w-md bg-white flex flex-col relative shadow-2xl overflow-hidden">
         
         <!-- Login Screen -->
@@ -91,11 +103,11 @@
             <div class="w-full space-y-4">
                 <div>
                     <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Your Fixed ID</label>
-                    <input type="text" id="my-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal focus:ring-1 focus:ring-wa-lightTeal transition" placeholder="e.g. rahul-123">
+                    <input type="text" id="my-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal focus:ring-1 focus:ring-wa-lightTeal transition" placeholder="e.g. rahul-123" autocomplete="off">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Partner's Fixed ID</label>
-                    <input type="text" id="partner-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal focus:ring-1 focus:ring-wa-lightTeal transition" placeholder="e.g. rohan-456">
+                    <input type="text" id="partner-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal focus:ring-1 focus:ring-wa-lightTeal transition" placeholder="e.g. rohan-456" autocomplete="off">
                 </div>
                 
                 <button id="connect-btn" class="w-full bg-wa-lightTeal hover:bg-wa-teal text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 mt-4 transition shadow-md">
@@ -111,7 +123,7 @@
         <div id="chat-screen" class="hidden absolute inset-0 bg-wa-chatBg flex flex-col z-10 bg-chat-pattern bg-cover bg-center">
             
             <!-- Chat Header -->
-            <div class="bg-wa-lightTeal text-white px-4 py-3 flex items-center justify-between shadow-md z-10">
+            <div class="bg-wa-lightTeal text-white px-3 py-2.5 flex items-center justify-between shadow-md z-20">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
                         <i class="ph-fill ph-user text-2xl text-gray-500"></i>
@@ -121,48 +133,67 @@
                         <p id="chat-status" class="text-xs text-wa-bg opacity-90">Connecting...</p>
                     </div>
                 </div>
-                <div class="flex gap-4">
+                <div class="flex items-center gap-2 relative">
                     <button id="btn-video-call" class="hover:bg-white/20 p-2 rounded-full transition">
                         <i class="ph-fill ph-video-camera text-xl"></i>
                     </button>
                     <button id="btn-audio-call" class="hover:bg-white/20 p-2 rounded-full transition">
                         <i class="ph-fill ph-phone text-xl"></i>
                     </button>
-                </div>
-            </div>
-
-            <!-- Messages Area -->
-            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 flex flex-col gap-2 relative z-0 pb-20">
-                <!-- Messages will be injected here via JS -->
-                
-                <!-- Encryption Notice -->
-                <div class="flex justify-center mb-4">
-                    <div class="bg-[#FFEECD] text-gray-700 text-[11px] px-4 py-1.5 rounded-lg text-center max-w-[85%] shadow-sm">
-                        <i class="ph-fill ph-lock-key inline align-middle mr-1"></i>
-                        Messages and calls are end-to-end encrypted directly between your devices. No server stores your chats.
+                    <!-- Chat Menu Button -->
+                    <button id="btn-chat-menu" class="hover:bg-white/20 p-2 rounded-full transition ml-1">
+                        <i class="ph-fill ph-dots-three-vertical text-xl"></i>
+                    </button>
+                    
+                    <!-- Dropdown Menu -->
+                    <div id="chat-dropdown" class="hidden absolute top-12 right-0 bg-white text-gray-800 shadow-xl rounded-lg w-40 overflow-hidden z-50">
+                        <button id="btn-clear-chat" class="w-full text-left px-4 py-3 hover:bg-gray-100 text-sm flex items-center gap-2">
+                            <i class="ph ph-trash text-lg text-gray-600"></i> Clear Chat
+                        </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Input Area -->
-            <div class="bg-gray-100 px-2 py-2 flex items-end gap-2 z-10">
-                <div class="flex-1 bg-white rounded-2xl flex items-end shadow-sm">
+            <!-- Messages Area -->
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 flex flex-col gap-2 relative z-0">
+                <!-- Messages will be injected here via JS -->
+            </div>
+
+            <!-- Input Area (Safe bottom padding applied here) -->
+            <div class="bg-gray-100 px-2 pt-2 safe-bottom flex items-end gap-2 z-10 shadow-[0_-2px_5px_rgba(0,0,0,0.05)]">
+                <div class="flex-1 bg-white rounded-2xl flex items-end shadow-sm mb-2">
                     <button class="p-3 text-gray-500 hover:text-gray-700">
                         <i class="ph ph-smiley text-xl text-gray-400"></i>
                     </button>
-                    <textarea id="msg-input" rows="1" class="flex-1 bg-transparent py-3 focus:outline-none resize-none max-h-32 text-gray-800" placeholder="Type a message"></textarea>
+                    <textarea id="msg-input" rows="1" class="flex-1 bg-transparent py-3 focus:outline-none resize-none max-h-32 text-gray-800" placeholder="Message"></textarea>
                     <button class="p-3 text-gray-500 hover:text-gray-700">
                         <i class="ph ph-paperclip text-xl text-gray-400"></i>
                     </button>
                 </div>
-                <button id="send-btn" class="w-12 h-12 rounded-full bg-wa-lightTeal hover:bg-wa-teal text-white flex items-center justify-center flex-shrink-0 shadow-md transition disabled:opacity-50">
+                <button id="send-btn" class="w-12 h-12 rounded-full bg-wa-lightTeal hover:bg-wa-teal text-white flex items-center justify-center flex-shrink-0 shadow-md transition disabled:opacity-50 mb-2">
                     <i class="ph-fill ph-paper-plane-right text-xl"></i>
                 </button>
             </div>
         </div>
 
+        <!-- Message Action Modal -->
+        <div id="msg-action-modal" class="hidden absolute inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+            <div class="bg-white rounded-xl w-full max-w-[280px] flex flex-col overflow-hidden shadow-2xl transform transition-transform scale-100">
+                <div class="px-4 py-3 border-b border-gray-100 font-semibold text-gray-700 text-sm">Message Options</div>
+                <button id="btn-delete-me" class="px-4 py-3.5 text-left border-b hover:bg-gray-50 flex items-center gap-3 text-gray-800 transition">
+                    <i class="ph ph-trash text-xl text-gray-500"></i> Delete for me
+                </button>
+                <button id="btn-delete-everyone" class="hidden px-4 py-3.5 text-left border-b hover:bg-gray-50 flex items-center gap-3 text-red-500 transition">
+                    <i class="ph ph-trash text-xl"></i> Delete for everyone
+                </button>
+                <button id="btn-action-cancel" class="px-4 py-3.5 text-center font-medium text-gray-600 hover:bg-gray-50 transition">
+                    Cancel
+                </button>
+            </div>
+        </div>
+
         <!-- Call Screen (Overlay) -->
-        <div id="call-screen" class="hidden absolute inset-0 bg-gray-900 z-50 flex flex-col relative">
+        <div id="call-screen" class="hidden absolute inset-0 bg-gray-900 z-[60] flex flex-col relative">
             <!-- Remote Video -->
             <video id="remote-video" autoplay playsinline class="w-full h-full object-cover"></video>
             
@@ -178,7 +209,7 @@
             </div>
 
             <!-- Call Controls -->
-            <div class="absolute bottom-8 w-full flex justify-center gap-6 z-40">
+            <div class="absolute bottom-8 w-full flex justify-center gap-6 z-40 safe-bottom">
                 <button id="toggle-mic-btn" class="w-14 h-14 rounded-full bg-gray-700/80 hover:bg-gray-600 backdrop-blur text-white flex items-center justify-center transition shadow-lg">
                     <i class="ph-fill ph-microphone text-2xl" id="mic-icon"></i>
                 </button>
@@ -192,7 +223,7 @@
         </div>
 
         <!-- Incoming Call Modal -->
-        <div id="incoming-call-modal" class="hidden absolute inset-0 bg-black/80 backdrop-blur-sm z-[60] flex flex-col items-center justify-center">
+        <div id="incoming-call-modal" class="hidden absolute inset-0 bg-black/80 backdrop-blur-sm z-[70] flex flex-col items-center justify-center">
             <div class="w-24 h-24 bg-wa-lightTeal rounded-full flex items-center justify-center animate-bounce shadow-[0_0_30px_rgba(37,211,102,0.5)]">
                 <i class="ph-fill ph-phone-ringing text-5xl text-white"></i>
             </div>
@@ -245,7 +276,12 @@
             acceptCall: document.getElementById('accept-call-btn'),
             rejectCall: document.getElementById('reject-call-btn'),
             toggleMic: document.getElementById('toggle-mic-btn'),
-            toggleVideo: document.getElementById('toggle-video-btn')
+            toggleVideo: document.getElementById('toggle-video-btn'),
+            chatMenu: document.getElementById('btn-chat-menu'),
+            clearChat: document.getElementById('btn-clear-chat'),
+            actionCancel: document.getElementById('btn-action-cancel'),
+            deleteMe: document.getElementById('btn-delete-me'),
+            deleteEveryone: document.getElementById('btn-delete-everyone')
         };
         
         const ui = {
@@ -260,7 +296,9 @@
             remoteVideo: document.getElementById('remote-video'),
             micIcon: document.getElementById('mic-icon'),
             videoIcon: document.getElementById('video-icon'),
-            localVideoContainer: document.getElementById('local-video-container')
+            localVideoContainer: document.getElementById('local-video-container'),
+            chatDropdown: document.getElementById('chat-dropdown'),
+            msgActionModal: document.getElementById('msg-action-modal')
         };
 
         // State Variables
@@ -275,16 +313,26 @@
         let callInterval = null;
         let callSeconds = 0;
         
-        // Load saved IDs if any
+        // Chat History State
+        let currentChatKey = '';
+        let chatHistory = []; // Array of message objects
+        let selectedMsgId = null; // Track message for context menu
+        
         window.onload = () => {
-            if(localStorage.getItem('myFixedId')) inputs.myId.value = localStorage.getItem('myFixedId');
-            if(localStorage.getItem('partnerFixedId')) inputs.partnerId.value = localStorage.getItem('partnerFixedId');
-            
+            // IDs are NO LONGER auto-filled as requested.
+
             // Auto-resize textarea
             inputs.msg.addEventListener('input', function() {
                 this.style.height = 'auto';
                 this.style.height = (this.scrollHeight) + 'px';
                 if(this.value.trim() === '') this.style.height = 'auto'; // Reset
+            });
+            
+            // Close dropdowns if clicked outside
+            document.addEventListener('click', (e) => {
+                if(!btn.chatMenu.contains(e.target) && !ui.chatDropdown.contains(e.target)) {
+                    ui.chatDropdown.classList.add('hidden');
+                }
             });
         };
 
@@ -300,16 +348,137 @@
                 showLoginStatus("IDs cannot be the same", "text-red-500");
                 return;
             }
-
-            localStorage.setItem('myFixedId', myId);
-            localStorage.setItem('partnerFixedId', partnerId);
             
+            // Load History before connecting
+            loadChatHistory(myId, partnerId);
             initializePeer(myId, partnerId);
         });
 
         function showLoginStatus(msg, colorClass) {
             ui.statusMsg.textContent = msg;
             ui.statusMsg.className = `text-sm mt-6 text-center font-medium h-6 ${colorClass}`;
+        }
+
+        function loadChatHistory(myId, partnerId) {
+            // Create a unique key for this conversation
+            currentChatKey = `chat_${myId}_${partnerId}`;
+            const saved = localStorage.getItem(currentChatKey);
+            
+            ui.messagesArea.innerHTML = '';
+            addEncryptionNotice();
+            
+            if (saved) {
+                try {
+                    chatHistory = JSON.parse(saved);
+                    // Render all saved messages
+                    chatHistory.forEach(msgObj => {
+                        renderMessageDOM(msgObj);
+                    });
+                } catch(e) {
+                    console.error("Error loading history", e);
+                    chatHistory = [];
+                }
+            } else {
+                chatHistory = [];
+            }
+        }
+
+        function saveChatHistory() {
+            if(currentChatKey) {
+                localStorage.setItem(currentChatKey, JSON.stringify(chatHistory));
+            }
+        }
+
+        function addEncryptionNotice() {
+            const div = document.createElement('div');
+            div.className = "flex justify-center mb-4 mt-2";
+            div.innerHTML = `
+                <div class="bg-[#FFEECD] text-gray-700 text-[11px] px-4 py-1.5 rounded-lg text-center max-w-[85%] shadow-sm">
+                    <i class="ph-fill ph-lock-key inline align-middle mr-1"></i>
+                    Messages and calls are end-to-end encrypted directly between your devices. No server stores your chats.
+                </div>
+            `;
+            ui.messagesArea.appendChild(div);
+        }
+
+        btn.chatMenu.addEventListener('click', () => {
+            ui.chatDropdown.classList.toggle('hidden');
+        });
+
+        btn.clearChat.addEventListener('click', () => {
+            if(confirm("Are you sure you want to clear this chat? This cannot be undone.")) {
+                chatHistory = [];
+                saveChatHistory();
+                ui.messagesArea.innerHTML = '';
+                addEncryptionNotice();
+                ui.chatDropdown.classList.add('hidden');
+            }
+        });
+        
+        btn.actionCancel.addEventListener('click', () => {
+            ui.msgActionModal.classList.add('hidden');
+            selectedMsgId = null;
+        });
+
+        // Delete For Me
+        btn.deleteMe.addEventListener('click', () => {
+            if(!selectedMsgId) return;
+            
+            // Remove from array
+            chatHistory = chatHistory.filter(m => m.id !== selectedMsgId);
+            saveChatHistory();
+            
+            // Remove from DOM
+            const bubble = document.getElementById(selectedMsgId);
+            if(bubble && bubble.parentElement) {
+                bubble.parentElement.remove();
+            }
+            
+            ui.msgActionModal.classList.add('hidden');
+            selectedMsgId = null;
+        });
+        
+        // Delete For Everyone
+        btn.deleteEveryone.addEventListener('click', () => {
+            if(!selectedMsgId) return;
+            
+            const msgIndex = chatHistory.findIndex(m => m.id === selectedMsgId);
+            if(msgIndex > -1) {
+                chatHistory[msgIndex].isDeleted = true;
+                saveChatHistory();
+                
+                // Update Local DOM
+                updateDOMToDeleted(selectedMsgId, chatHistory[msgIndex].type);
+                
+                // Send Delete Request via P2P
+                if (dataConn && dataConn.open) {
+                    dataConn.send({ type: 'delete-msg', msgId: selectedMsgId });
+                }
+            }
+            
+            ui.msgActionModal.classList.add('hidden');
+            selectedMsgId = null;
+        });
+
+        function updateDOMToDeleted(msgId, type) {
+            const bubble = document.getElementById(msgId);
+            if(bubble) {
+                bubble.classList.add('bubble-deleted');
+                bubble.classList.remove('bg-wa-sent', 'bg-wa-rcvd', 'bubble-tail-sent', 'bubble-tail-rcvd');
+                bubble.classList.add('bg-white', 'border', 'border-gray-200', 'italic', 'text-gray-500');
+                
+                const timeStr = bubble.querySelector('.text-gray-500').textContent; // Keep existing time
+                
+                let iconStr = '<i class="ph ph-prohibit mr-1 text-lg"></i>';
+                let textStr = type === 'sent' ? 'You deleted this message' : 'This message was deleted';
+                
+                bubble.innerHTML = `
+                    <div class="mr-1 flex items-center">${iconStr} ${textStr}</div>
+                    <div class="flex items-center justify-end gap-1 mt-0.5 opacity-80">
+                        <span class="text-[10px] text-gray-400">${timeStr}</span>
+                    </div>
+                `;
+            }
         }
 
         function initializePeer(myId, partnerId) {
@@ -327,20 +496,17 @@
             });
 
             peer.on('open', (id) => {
-                // Connected to PeerJS Server
                 showLoginStatus("Logged in! Connecting to partner...", "text-green-500");
-                
-                // Show chat screen UI immediately
                 screens.login.classList.add('hidden');
                 screens.chat.classList.remove('hidden');
                 ui.chatPartner.textContent = partnerId;
-                
-                // Try to establish Data connection with partner
                 connectToPartner(partnerId);
+                
+                // Scroll to bottom after loading history
+                setTimeout(() => ui.messagesArea.scrollTop = ui.messagesArea.scrollHeight, 50);
             });
 
             peer.on('connection', (conn) => {
-                // Incoming data connection
                 setupDataConnection(conn);
             });
 
@@ -355,7 +521,6 @@
                     screens.chat.classList.add('hidden');
                 } else if (err.type === 'peer-unavailable') {
                     ui.chatStatus.textContent = "Offline (Waiting for partner...)";
-                    // Retry connecting every 5 seconds if partner is offline
                     setTimeout(() => connectToPartner(partnerId), 5000);
                 } else {
                     ui.chatStatus.textContent = "Network Error";
@@ -369,8 +534,7 @@
         }
 
         function connectToPartner(partnerId) {
-            if (dataConn && dataConn.open) return; // Already connected
-            
+            if (dataConn && dataConn.open) return; 
             ui.chatStatus.textContent = "Connecting to partner...";
             const conn = peer.connect(partnerId, { reliable: true });
             setupDataConnection(conn);
@@ -378,53 +542,87 @@
 
         function setupDataConnection(conn) {
             dataConn = conn;
-            
             conn.on('open', () => {
                 ui.chatStatus.textContent = "Online";
-                // Send all unread acks if any (simplified: just send a ping)
                 conn.send({ type: 'ping' });
+                
+                // If we reconnect, maybe some pending messages were delivered
+                // For simplicity, we just convert 'pending' to 'sent' visually upon connection
+                chatHistory.forEach(m => {
+                    if (m.type === 'sent' && m.status === 'pending') {
+                        m.status = 'sent';
+                        updateMessageTicks(m.id, 'sent');
+                    }
+                });
+                saveChatHistory();
             });
 
-            conn.on('data', (data) => {
-                handleIncomingData(data);
-            });
+            conn.on('data', handleIncomingData);
 
             conn.on('close', () => {
                 ui.chatStatus.textContent = "Offline";
                 dataConn = null;
-                // Try to reconnect
                 setTimeout(() => connectToPartner(inputs.partnerId.value), 3000);
             });
         }
 
         function handleIncomingData(data) {
-            if (data.type === 'ping') {
-                // Just an online check
-                return;
-            }
+            if (data.type === 'ping') return;
+            
             if (data.type === 'msg') {
-                // Received a message
-                renderMessage(data.id, data.text, data.timestamp, 'rcvd', null);
+                const msgObj = {
+                    id: data.id,
+                    text: data.text,
+                    timestamp: data.timestamp,
+                    type: 'rcvd',
+                    status: null,
+                    isDeleted: false
+                };
                 
-                // Send Delivery Ack
+                chatHistory.push(msgObj);
+                saveChatHistory();
+                renderMessageDOM(msgObj);
+                
                 if (dataConn && dataConn.open) {
                     let status = document.visibilityState === 'visible' ? 'read' : 'delivered';
                     dataConn.send({ type: 'ack', msgId: data.id, status: status });
                 }
             }
+            
             if (data.type === 'ack') {
-                // Update tick marks for our sent messages
-                updateMessageTicks(data.msgId, data.status);
+                const msg = chatHistory.find(m => m.id === data.msgId);
+                if(msg) {
+                    msg.status = data.status;
+                    saveChatHistory();
+                    updateMessageTicks(data.msgId, data.status);
+                }
+            }
+            
+            if (data.type === 'read-all') {
+                chatHistory.forEach(m => {
+                    if(m.type === 'sent' && (m.status === 'delivered' || m.status === 'sent')) {
+                        m.status = 'read';
+                        updateMessageTicks(m.id, 'read');
+                    }
+                });
+                saveChatHistory();
+            }
+
+            // Handle remote delete request
+            if (data.type === 'delete-msg') {
+                const msg = chatHistory.find(m => m.id === data.msgId);
+                if (msg) {
+                    msg.isDeleted = true;
+                    saveChatHistory();
+                    updateDOMToDeleted(data.msgId, 'rcvd');
+                }
             }
         }
 
-        // Detect window focus to send "Read" acks
         document.addEventListener("visibilitychange", () => {
             if (document.visibilityState === "visible" && dataConn && dataConn.open) {
-                // In a full app, track which messages are unread and send acks. 
-                // Here we'll just send a general "read-all" ping.
                 dataConn.send({ type: 'read-all' });
-                // Convert all delivered ticks to read ticks visually
+                // Update local visual states to read
                 document.querySelectorAll('.tick-delivered').forEach(el => {
                     el.className = 'ph-bold ph-checks text-blue-500 tick-read text-[14px]';
                 });
@@ -444,73 +642,84 @@
             if (!text) return;
             
             const msgId = 'msg-' + Date.now();
-            const timestamp = new Date();
+            const timestamp = new Date().getTime();
             
-            // 1. Render immediately as Pending (Clock)
-            renderMessage(msgId, text, timestamp, 'sent', 'pending');
+            const msgObj = {
+                id: msgId,
+                text: text,
+                timestamp: timestamp,
+                type: 'sent',
+                status: (dataConn && dataConn.open) ? 'sent' : 'pending',
+                isDeleted: false
+            };
+            
+            chatHistory.push(msgObj);
+            saveChatHistory();
+            renderMessageDOM(msgObj);
+            
             inputs.msg.value = '';
-            inputs.msg.style.height = 'auto'; // reset height
+            inputs.msg.style.height = 'auto';
 
-            // 2. Send via PeerJS
             if (dataConn && dataConn.open) {
-                dataConn.send({
-                    type: 'msg',
-                    id: msgId,
-                    text: text,
-                    timestamp: timestamp.getTime()
-                });
-                // Once sent over network, update to Sent (1 Tick)
-                updateMessageTicks(msgId, 'sent');
-            } else {
-                // If offline, it stays pending until reconnected
-                // We'll queue it (simplified for this demo by letting it fail or stay pending)
-                ui.chatStatus.textContent = "Offline - Waiting to connect...";
+                dataConn.send({ type: 'msg', id: msgId, text: text, timestamp: timestamp });
             }
         }
 
-        function formatTime(dateObj) {
-            const d = new Date(dateObj);
+        function formatTime(ts) {
+            const d = new Date(ts);
             let h = d.getHours();
             let m = d.getMinutes();
             const ampm = h >= 12 ? 'PM' : 'AM';
-            h = h % 12;
-            h = h ? h : 12; // the hour '0' should be '12'
+            h = h % 12; h = h ? h : 12;
             m = m < 10 ? '0'+m : m;
             return `${h}:${m} ${ampm}`;
         }
 
-        function renderMessage(id, text, timestamp, type, status) {
-            const isSent = type === 'sent';
+        function renderMessageDOM(msgObj) {
+            const isSent = msgObj.type === 'sent';
             
-            // Format text (convert newlines to <br>)
-            const formattedText = text.replace(/\n/g, '<br>');
-            
-            // Build Ticks HTML
-            let ticksHtml = '';
-            if (isSent) {
-                ticksHtml = getTickHtml(status);
-            }
-
             const wrapper = document.createElement('div');
-            wrapper.className = `flex w-full ${isSent ? 'justify-end' : 'justify-start'} mb-1`;
+            wrapper.className = `flex w-full ${isSent ? 'justify-end' : 'justify-start'} mb-1 relative`;
             
             const bubble = document.createElement('div');
-            bubble.id = id;
-            bubble.className = `relative max-w-[80%] px-2.5 py-1.5 rounded-lg shadow-sm text-[15px] text-gray-800 break-words
+            bubble.id = msgObj.id;
+            bubble.className = `relative max-w-[80%] px-2.5 py-1.5 rounded-lg shadow-sm text-[15px] text-gray-800 break-words cursor-pointer active:opacity-80 transition-opacity
                 ${isSent ? 'bg-wa-sent rounded-tr-none bubble-tail-sent' : 'bg-wa-rcvd rounded-tl-none bubble-tail-rcvd'}`;
+            
+            // Add click listener for options menu
+            bubble.addEventListener('click', () => {
+                selectedMsgId = msgObj.id;
+                ui.msgActionModal.classList.remove('hidden');
+                
+                // Show/hide 'Delete for Everyone' based on sender
+                if (isSent && !msgObj.isDeleted) {
+                    btn.deleteEveryone.classList.remove('hidden');
+                } else {
+                    btn.deleteEveryone.classList.add('hidden');
+                }
+            });
+            
+            if (msgObj.isDeleted) {
+                wrapper.appendChild(bubble);
+                ui.messagesArea.appendChild(wrapper);
+                updateDOMToDeleted(msgObj.id, msgObj.type);
+                return;
+            }
+
+            const formattedText = msgObj.text.replace(/\n/g, '<br>');
+            let ticksHtml = isSent ? getTickHtml(msgObj.status) : '';
             
             bubble.innerHTML = `
                 <div class="mr-1">${formattedText}</div>
-                <div class="flex items-center justify-end gap-1 mt-0.5 opacity-80">
-                    <span class="text-[10px] text-gray-500">${formatTime(timestamp)}</span>
+                <div class="flex items-center justify-end gap-1 mt-0.5 opacity-80 float-right ml-2 relative top-1">
+                    <span class="text-[10px] text-gray-500">${formatTime(msgObj.timestamp)}</span>
                     <span class="ticks-container">${ticksHtml}</span>
                 </div>
+                <div class="clear-both"></div>
             `;
             
             wrapper.appendChild(bubble);
             ui.messagesArea.appendChild(wrapper);
-            
-            // Scroll to bottom
             ui.messagesArea.scrollTop = ui.messagesArea.scrollHeight;
         }
 
@@ -526,9 +735,7 @@
             const bubble = document.getElementById(msgId);
             if (bubble) {
                 const tickContainer = bubble.querySelector('.ticks-container');
-                if (tickContainer) {
-                    tickContainer.innerHTML = getTickHtml(status);
-                }
+                if (tickContainer) tickContainer.innerHTML = getTickHtml(status);
             }
         }
 
@@ -591,7 +798,6 @@
             
             const isVideo = call.metadata && call.metadata.type === 'video';
             if(!isVideo) {
-                // If it's audio only, maybe update UI slightly
                 ui.callerIdDisplay.nextElementSibling.textContent = "Incoming audio call";
             }
         }
@@ -682,8 +888,8 @@
         }
 
         btn.endCall.addEventListener('click', () => {
-            if(mediaCall) mediaCall.close(); // Triggers the 'close' event handler
-            else endCallUI(); // Force end if connection wasn't fully established
+            if(mediaCall) mediaCall.close();
+            else endCallUI();
         });
 
         btn.toggleMic.addEventListener('click', () => {

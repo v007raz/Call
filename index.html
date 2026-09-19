@@ -3,466 +3,720 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Peer2Peer Video Call</title>
+    <title>P2P WhatsApp Clone</title>
     
-    <!-- Tailwind CSS for modern, responsive, dark-themed styling -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        wa: {
+                            teal: '#075E54',
+                            lightTeal: '#128C7E',
+                            green: '#25D366',
+                            bg: '#ECE5DD',
+                            chatBg: '#efeae2',
+                            sent: '#dcf8c6',
+                            rcvd: '#ffffff'
+                        }
+                    },
+                    backgroundImage: {
+                        'chat-pattern': "url('https://w0.peakpx.com/wallpaper/818/148/HD-wallpaper-whatsapp-background-cool-dark-green-new-theme-whatsapp.jpg')"
+                    }
+                }
+            }
+        }
+    </script>
     
-    <!-- Phosphor Icons for modern UI controls -->
+    <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    <!-- PeerJS for WebRTC Peer-to-Peer connection -->
+    <!-- PeerJS -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
     <style>
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            /* Prevent pull-to-refresh on mobile */
             overscroll-behavior-y: none;
         }
         
-        /* Glassmorphism utility for floating UI */
-        .glass {
-            background: rgba(31, 41, 55, 0.7);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        /* Custom scrollbar for chat */
+        #chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+        #chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #chat-messages::-webkit-scrollbar-thumb {
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
         }
         
-        /* Smooth transitions */
-        .transition-all-200 {
-            transition: all 0.2s ease-in-out;
+        .bubble-tail-sent::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: -8px;
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, #dcf8c6 0%, #dcf8c6 50%, transparent 50%, transparent);
+        }
+        
+        .bubble-tail-rcvd::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -8px;
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(-135deg, #ffffff 0%, #ffffff 50%, transparent 50%, transparent);
         }
     </style>
 </head>
-<body class="bg-gray-950 text-gray-100 h-screen w-screen overflow-hidden flex flex-col relative">
+<body class="bg-gray-100 h-screen w-screen overflow-hidden flex items-center justify-center">
 
-    <!-- Setup Screen (Initial State) -->
-    <div id="setup-screen" class="flex-1 flex flex-col items-center justify-center p-6 z-10 transition-opacity duration-500">
-        <div class="max-w-md w-full bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl">
+    <!-- App Container (Limits width on desktop for mobile feel) -->
+    <div class="w-full h-full max-w-md bg-white flex flex-col relative shadow-2xl overflow-hidden">
+        
+        <!-- Login Screen -->
+        <div id="login-screen" class="absolute inset-0 bg-white z-20 flex flex-col items-center justify-center p-6">
             <div class="text-center mb-8">
-                <i class="ph ph-video-camera text-5xl text-blue-500 mb-2"></i>
-                <h1 class="text-2xl font-bold">Secure Video Call</h1>
-                <p class="text-sm text-gray-400 mt-2">Peer-to-peer connection for 2 people.</p>
+                <i class="ph-fill ph-whatsapp-logo text-7xl text-wa-green mb-4"></i>
+                <h1 class="text-2xl font-bold text-gray-800">Welcome to Chat</h1>
+                <p class="text-sm text-gray-500 mt-2">Connect directly peer-to-peer</p>
             </div>
 
-            <!-- Local ID Display -->
-            <div class="mb-6">
-                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Your Peer ID</label>
-                <div class="flex items-center gap-2 bg-gray-950 border border-gray-800 rounded-xl p-2">
-                    <input type="text" id="my-id-input" class="font-mono text-sm flex-1 bg-transparent text-gray-300 focus:outline-none px-2" placeholder="Enter custom ID...">
-                    <button id="set-id-btn" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg transition-all-200 text-xs font-bold text-white shadow-lg">SET</button>
-                    <button id="copy-id-btn" class="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg transition-all-200" title="Copy to clipboard">
-                        <i class="ph ph-copy text-lg"></i>
+            <div class="w-full space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Your Fixed ID</label>
+                    <input type="text" id="my-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal focus:ring-1 focus:ring-wa-lightTeal transition" placeholder="e.g. rahul-123">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Partner's Fixed ID</label>
+                    <input type="text" id="partner-id-input" class="w-full bg-gray-50 border border-gray-300 rounded-lg p-3 focus:outline-none focus:border-wa-lightTeal focus:ring-1 focus:ring-wa-lightTeal transition" placeholder="e.g. rohan-456">
+                </div>
+                
+                <button id="connect-btn" class="w-full bg-wa-lightTeal hover:bg-wa-teal text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 mt-4 transition shadow-md">
+                    Connect & Start Chat
+                    <i class="ph-bold ph-arrow-right"></i>
+                </button>
+            </div>
+            
+            <div id="login-status" class="text-sm mt-6 text-center font-medium h-6"></div>
+        </div>
+
+        <!-- Chat Screen -->
+        <div id="chat-screen" class="hidden absolute inset-0 bg-wa-chatBg flex flex-col z-10 bg-chat-pattern bg-cover bg-center">
+            
+            <!-- Chat Header -->
+            <div class="bg-wa-lightTeal text-white px-4 py-3 flex items-center justify-between shadow-md z-10">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
+                        <i class="ph-fill ph-user text-2xl text-gray-500"></i>
+                    </div>
+                    <div>
+                        <h2 id="chat-partner-name" class="font-semibold text-lg leading-tight">Partner</h2>
+                        <p id="chat-status" class="text-xs text-wa-bg opacity-90">Connecting...</p>
+                    </div>
+                </div>
+                <div class="flex gap-4">
+                    <button id="btn-video-call" class="hover:bg-white/20 p-2 rounded-full transition">
+                        <i class="ph-fill ph-video-camera text-xl"></i>
+                    </button>
+                    <button id="btn-audio-call" class="hover:bg-white/20 p-2 rounded-full transition">
+                        <i class="ph-fill ph-phone text-xl"></i>
                     </button>
                 </div>
-                <p class="text-[10px] text-gray-500 mt-1 ml-1">Set a custom fixed ID to easily connect next time.</p>
             </div>
 
-            <div class="relative flex py-4 items-center">
-                <div class="flex-grow border-t border-gray-800"></div>
-                <span class="flex-shrink-0 mx-4 text-gray-500 text-sm">Start a connection</span>
-                <div class="flex-grow border-t border-gray-800"></div>
+            <!-- Messages Area -->
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 flex flex-col gap-2 relative z-0 pb-20">
+                <!-- Messages will be injected here via JS -->
+                
+                <!-- Encryption Notice -->
+                <div class="flex justify-center mb-4">
+                    <div class="bg-[#FFEECD] text-gray-700 text-[11px] px-4 py-1.5 rounded-lg text-center max-w-[85%] shadow-sm">
+                        <i class="ph-fill ph-lock-key inline align-middle mr-1"></i>
+                        Messages and calls are end-to-end encrypted directly between your devices. No server stores your chats.
+                    </div>
+                </div>
             </div>
 
-            <!-- Remote ID Input -->
-            <div class="mb-6">
-                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Partner's Peer ID</label>
-                <input type="text" id="remote-id-input" placeholder="Enter remote ID here" 
-                       class="w-full bg-gray-950 border border-gray-800 rounded-xl p-4 font-mono text-sm focus:outline-none focus:border-blue-500 transition-all-200 placeholder-gray-600">
-            </div>
-
-            <button id="call-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition-all-200 disabled:opacity-50 disabled:cursor-not-allowed">
-                <i class="ph ph-phone-call text-xl"></i>
-                Start Call
-            </button>
-            
-            <!-- Status message container -->
-            <div id="status-msg" class="text-center text-sm text-gray-400 mt-4 min-h-[40px]"></div>
-        </div>
-    </div>
-
-    <!-- Call Screen (Hidden Initially) -->
-    <div id="call-screen" class="hidden absolute inset-0 bg-black z-20 flex items-center justify-center">
-        
-        <!-- Remote Video (Main) -->
-        <video id="remote-video" autoplay playsinline class="w-full h-full object-cover"></video>
-        
-        <!-- Local Video (Picture in Picture) -->
-        <!-- Muted to prevent feedback loop for the local user -->
-        <div class="absolute bottom-24 right-4 md:bottom-8 md:right-8 w-32 md:w-48 aspect-[3/4] bg-gray-800 rounded-xl overflow-hidden shadow-2xl border-2 border-gray-700 z-30 transition-all-200 hover:scale-105">
-            <video id="local-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
-            <div class="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-[10px] font-semibold tracking-wider">YOU</div>
-        </div>
-
-        <!-- Call Controls -->
-        <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 glass rounded-2xl p-2 flex items-center gap-2 md:gap-4 z-40">
-            <button id="toggle-mic-btn" class="p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all-200" title="Toggle Microphone">
-                <i class="ph ph-microphone text-xl" id="mic-icon"></i>
-            </button>
-            <button id="toggle-video-btn" class="p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition-all-200" title="Toggle Camera">
-                <i class="ph ph-video-camera text-xl" id="video-icon"></i>
-            </button>
-            <button id="end-call-btn" class="p-4 rounded-xl bg-red-600 hover:bg-red-500 transition-all-200" title="End Call">
-                <i class="ph ph-phone-disconnect text-xl text-white"></i>
-            </button>
-        </div>
-    </div>
-
-    <!-- Incoming Call Modal -->
-    <div id="incoming-call-modal" class="hidden absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
-        <div class="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl animate-pulse">
-            <div class="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i class="ph ph-phone-ringing text-4xl text-blue-500"></i>
-            </div>
-            <h2 class="text-xl font-bold mb-2">Incoming Call</h2>
-            <p class="text-sm text-gray-400 mb-6 font-mono truncate px-4" id="caller-id-display">Caller ID</p>
-            
-            <div class="flex gap-4">
-                <button id="reject-call-btn" class="flex-1 bg-red-600 hover:bg-red-500 py-3 rounded-xl font-semibold transition-all-200 flex items-center justify-center gap-2">
-                    <i class="ph ph-x"></i> Decline
+            <!-- Input Area -->
+            <div class="bg-gray-100 px-2 py-2 flex items-end gap-2 z-10">
+                <div class="flex-1 bg-white rounded-2xl flex items-end shadow-sm">
+                    <button class="p-3 text-gray-500 hover:text-gray-700">
+                        <i class="ph ph-smiley text-xl text-gray-400"></i>
+                    </button>
+                    <textarea id="msg-input" rows="1" class="flex-1 bg-transparent py-3 focus:outline-none resize-none max-h-32 text-gray-800" placeholder="Type a message"></textarea>
+                    <button class="p-3 text-gray-500 hover:text-gray-700">
+                        <i class="ph ph-paperclip text-xl text-gray-400"></i>
+                    </button>
+                </div>
+                <button id="send-btn" class="w-12 h-12 rounded-full bg-wa-lightTeal hover:bg-wa-teal text-white flex items-center justify-center flex-shrink-0 shadow-md transition disabled:opacity-50">
+                    <i class="ph-fill ph-paper-plane-right text-xl"></i>
                 </button>
-                <button id="accept-call-btn" class="flex-1 bg-green-600 hover:bg-green-500 py-3 rounded-xl font-semibold transition-all-200 flex items-center justify-center gap-2">
-                    <i class="ph ph-phone text-white"></i> Accept
+            </div>
+        </div>
+
+        <!-- Call Screen (Overlay) -->
+        <div id="call-screen" class="hidden absolute inset-0 bg-gray-900 z-50 flex flex-col relative">
+            <!-- Remote Video -->
+            <video id="remote-video" autoplay playsinline class="w-full h-full object-cover"></video>
+            
+            <!-- Local Video (PIP) -->
+            <div id="local-video-container" class="absolute top-16 right-4 w-28 aspect-[3/4] bg-gray-800 rounded-xl overflow-hidden shadow-2xl border-2 border-gray-700 z-30 transition-all">
+                <video id="local-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+            </div>
+
+            <!-- Header info -->
+            <div class="absolute top-0 left-0 w-full p-6 bg-gradient-to-b from-black/70 to-transparent flex flex-col items-center z-20">
+                <h3 id="call-partner-display" class="text-white text-lg font-semibold">Partner</h3>
+                <p id="call-duration" class="text-gray-300 text-sm">Calling...</p>
+            </div>
+
+            <!-- Call Controls -->
+            <div class="absolute bottom-8 w-full flex justify-center gap-6 z-40">
+                <button id="toggle-mic-btn" class="w-14 h-14 rounded-full bg-gray-700/80 hover:bg-gray-600 backdrop-blur text-white flex items-center justify-center transition shadow-lg">
+                    <i class="ph-fill ph-microphone text-2xl" id="mic-icon"></i>
+                </button>
+                <button id="end-call-btn" class="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition shadow-xl transform hover:scale-105">
+                    <i class="ph-fill ph-phone-disconnect text-3xl"></i>
+                </button>
+                <button id="toggle-video-btn" class="w-14 h-14 rounded-full bg-gray-700/80 hover:bg-gray-600 backdrop-blur text-white flex items-center justify-center transition shadow-lg">
+                    <i class="ph-fill ph-video-camera text-2xl" id="video-icon"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Incoming Call Modal -->
+        <div id="incoming-call-modal" class="hidden absolute inset-0 bg-black/80 backdrop-blur-sm z-[60] flex flex-col items-center justify-center">
+            <div class="w-24 h-24 bg-wa-lightTeal rounded-full flex items-center justify-center animate-bounce shadow-[0_0_30px_rgba(37,211,102,0.5)]">
+                <i class="ph-fill ph-phone-ringing text-5xl text-white"></i>
+            </div>
+            <h2 class="text-white text-2xl font-bold mt-6 mb-2" id="incoming-caller-id">Caller Name</h2>
+            <p class="text-gray-300 mb-10">Incoming video call</p>
+            
+            <div class="flex gap-10">
+                <button id="reject-call-btn" class="w-16 h-16 rounded-full bg-red-500 flex flex-col items-center justify-center text-white shadow-lg">
+                    <i class="ph-fill ph-phone-disconnect text-2xl"></i>
+                </button>
+                <button id="accept-call-btn" class="w-16 h-16 rounded-full bg-green-500 flex flex-col items-center justify-center text-white shadow-lg animate-pulse">
+                    <i class="ph-fill ph-phone text-2xl"></i>
                 </button>
             </div>
         </div>
     </div>
 
     <script>
-        // Global error handler to catch WebSocket security blocks in the preview Canvas
+        // Catch Canvas Preview restrictions gracefully
         window.addEventListener('unhandledrejection', event => {
             if (event.reason && event.reason.toString().includes('is not allowed in Canvas')) {
-                const statusElement = document.getElementById('status-msg');
-                if (statusElement) {
-                    statusElement.innerHTML = "⚠️ WebSockets are blocked in this preview.<br/>The app will work normally once hosted on GitHub Pages.";
-                    statusElement.classList.remove('text-gray-400', 'text-red-500');
-                    statusElement.classList.add('text-orange-400');
-                }
-                const callBtnElement = document.getElementById('call-btn');
-                if (callBtnElement) {
-                    callBtnElement.disabled = true;
-                }
-                const idInput = document.getElementById('my-id-input');
-                if (idInput) {
-                    idInput.value = "Blocked in Preview";
-                    idInput.classList.add('text-orange-400');
-                }
-                event.preventDefault(); // Prevent standard console error crash
+                const status = document.getElementById('login-status');
+                status.innerHTML = "⚠️ WebSockets are blocked in Preview.<br>Please host on GitHub Pages.";
+                status.classList.add('text-orange-500');
+                document.getElementById('connect-btn').disabled = true;
+                event.preventDefault();
             }
         });
 
         // DOM Elements
-        const setupScreen = document.getElementById('setup-screen');
-        const callScreen = document.getElementById('call-screen');
-        const myIdInput = document.getElementById('my-id-input');
-        const setIdBtn = document.getElementById('set-id-btn');
-        const copyIdBtn = document.getElementById('copy-id-btn');
-        const remoteIdInput = document.getElementById('remote-id-input');
-        const callBtn = document.getElementById('call-btn');
-        const statusMsg = document.getElementById('status-msg');
+        const screens = {
+            login: document.getElementById('login-screen'),
+            chat: document.getElementById('chat-screen'),
+            call: document.getElementById('call-screen'),
+            incomingCall: document.getElementById('incoming-call-modal')
+        };
         
-        const localVideo = document.getElementById('local-video');
-        const remoteVideo = document.getElementById('remote-video');
+        const inputs = {
+            myId: document.getElementById('my-id-input'),
+            partnerId: document.getElementById('partner-id-input'),
+            msg: document.getElementById('msg-input')
+        };
         
-        const toggleMicBtn = document.getElementById('toggle-mic-btn');
-        const micIcon = document.getElementById('mic-icon');
-        const toggleVideoBtn = document.getElementById('toggle-video-btn');
-        const videoIcon = document.getElementById('video-icon');
-        const endCallBtn = document.getElementById('end-call-btn');
+        const btn = {
+            connect: document.getElementById('connect-btn'),
+            send: document.getElementById('send-btn'),
+            videoCall: document.getElementById('btn-video-call'),
+            audioCall: document.getElementById('btn-audio-call'),
+            endCall: document.getElementById('end-call-btn'),
+            acceptCall: document.getElementById('accept-call-btn'),
+            rejectCall: document.getElementById('reject-call-btn'),
+            toggleMic: document.getElementById('toggle-mic-btn'),
+            toggleVideo: document.getElementById('toggle-video-btn')
+        };
         
-        const incomingCallModal = document.getElementById('incoming-call-modal');
-        const callerIdDisplay = document.getElementById('caller-id-display');
-        const acceptCallBtn = document.getElementById('accept-call-btn');
-        const rejectCallBtn = document.getElementById('reject-call-btn');
+        const ui = {
+            statusMsg: document.getElementById('login-status'),
+            chatPartner: document.getElementById('chat-partner-name'),
+            chatStatus: document.getElementById('chat-status'),
+            messagesArea: document.getElementById('chat-messages'),
+            callerIdDisplay: document.getElementById('incoming-caller-id'),
+            callPartnerDisplay: document.getElementById('call-partner-display'),
+            callDuration: document.getElementById('call-duration'),
+            localVideo: document.getElementById('local-video'),
+            remoteVideo: document.getElementById('remote-video'),
+            micIcon: document.getElementById('mic-icon'),
+            videoIcon: document.getElementById('video-icon'),
+            localVideoContainer: document.getElementById('local-video-container')
+        };
 
         // State Variables
         let peer = null;
+        let dataConn = null;
+        let mediaCall = null;
+        let pendingCall = null;
         let localStream = null;
-        let currentCall = null;
-        let pendingIncomingCall = null;
         
         let isAudioMuted = false;
         let isVideoOff = false;
-        let peerId = null;
+        let callInterval = null;
+        let callSeconds = 0;
+        
+        // Load saved IDs if any
+        window.onload = () => {
+            if(localStorage.getItem('myFixedId')) inputs.myId.value = localStorage.getItem('myFixedId');
+            if(localStorage.getItem('partnerFixedId')) inputs.partnerId.value = localStorage.getItem('partnerFixedId');
+            
+            // Auto-resize textarea
+            inputs.msg.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = (this.scrollHeight) + 'px';
+                if(this.value.trim() === '') this.style.height = 'auto'; // Reset
+            });
+        };
 
-        // Initialize App
-        async function init() {
-            try {
-                // Request Camera and Microphone permissions
-                statusMsg.textContent = "Requesting camera & mic permissions...";
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                
-                // Show local video on setup screen (hidden logic) and call screen
-                localVideo.srcObject = localStream;
-                
-                const savedId = localStorage.getItem('fixedPeerId');
-                if (savedId) {
-                    myIdInput.value = savedId;
-                    initPeer(savedId);
-                } else {
-                    const randomId = 'user-' + Math.floor(Math.random() * 10000);
-                    myIdInput.value = randomId;
-                    initPeer(randomId);
-                }
-
-            } catch (err) {
-                console.error("Media Error:", err);
-                statusMsg.textContent = "Failed to access Camera/Microphone.";
-                statusMsg.classList.add('text-red-500');
-                callBtn.disabled = true;
+        btn.connect.addEventListener('click', () => {
+            const myId = inputs.myId.value.trim();
+            const partnerId = inputs.partnerId.value.trim();
+            
+            if (!myId || !partnerId) {
+                showLoginStatus("Please enter both IDs", "text-red-500");
+                return;
             }
+            if (myId === partnerId) {
+                showLoginStatus("IDs cannot be the same", "text-red-500");
+                return;
+            }
+
+            localStorage.setItem('myFixedId', myId);
+            localStorage.setItem('partnerFixedId', partnerId);
+            
+            initializePeer(myId, partnerId);
+        });
+
+        function showLoginStatus(msg, colorClass) {
+            ui.statusMsg.textContent = msg;
+            ui.statusMsg.className = `text-sm mt-6 text-center font-medium h-6 ${colorClass}`;
         }
 
-        function initPeer(customId) {
-            if (peer) {
-                peer.destroy(); // Clean up old peer if setting a new ID
-            }
+        function initializePeer(myId, partnerId) {
+            showLoginStatus("Connecting to server...", "text-blue-500");
+            btn.connect.disabled = true;
 
-            statusMsg.textContent = "Connecting to peer network...";
-            statusMsg.classList.remove('text-red-500');
+            if (peer) peer.destroy();
 
-            // Initialize PeerJS with explicit debug level to help diagnose issues
-            peer = new Peer(customId, {
-                debug: 2, // 2 = warnings & errors
+            peer = new Peer(myId, {
+                debug: 1,
                 config: {'iceServers': [
-                    { url: 'stun:stun.l.google.com:19302' }, // Use Google's free STUN
+                    { url: 'stun:stun.l.google.com:19302' },
                     { url: 'stun:stun1.l.google.com:19302' }
                 ]}
-            }); 
+            });
 
             peer.on('open', (id) => {
-                peerId = id;
-                myIdInput.value = id;
-                localStorage.setItem('fixedPeerId', id); // Save the ID to local storage
-                statusMsg.textContent = "Ready to connect.";
-                callBtn.disabled = false;
+                // Connected to PeerJS Server
+                showLoginStatus("Logged in! Connecting to partner...", "text-green-500");
+                
+                // Show chat screen UI immediately
+                screens.login.classList.add('hidden');
+                screens.chat.classList.remove('hidden');
+                ui.chatPartner.textContent = partnerId;
+                
+                // Try to establish Data connection with partner
+                connectToPartner(partnerId);
             });
+
+            peer.on('connection', (conn) => {
+                // Incoming data connection
+                setupDataConnection(conn);
+            });
+
+            peer.on('call', handleIncomingCall);
 
             peer.on('error', (err) => {
                 console.error("PeerJS Error:", err);
-                
                 if (err.type === 'unavailable-id') {
-                    statusMsg.textContent = "ID already taken! Try another.";
-                    statusMsg.classList.add('text-red-500');
-                    return;
-                }
-
-                // Don't show 'peer-unavailable' error as a critical failure on the main screen 
-                // if we are just trying to connect.
-                if (err.type !== 'peer-unavailable') {
-                    statusMsg.textContent = `Network Error. Reconnecting...`;
-                    statusMsg.classList.add('text-red-500');
-                    callBtn.disabled = true;
-                    // Attempt to reconnect if the connection to the server drops
-                    if (peer && !peer.destroyed) {
-                         setTimeout(() => {
-                             if(peer.disconnected) {
-                                 console.log("Attempting to reconnect...");
-                                 peer.reconnect();
-                             }
-                         }, 3000);
-                    }
-                } else if(statusMsg.textContent === "Calling...") {
-                     statusMsg.textContent = "User not found or offline.";
-                     setTimeout(() => { statusMsg.textContent = "Ready to connect."; }, 3000);
+                    showLoginStatus("This ID is already in use elsewhere.", "text-red-500");
+                    btn.connect.disabled = false;
+                    screens.login.classList.remove('hidden');
+                    screens.chat.classList.add('hidden');
+                } else if (err.type === 'peer-unavailable') {
+                    ui.chatStatus.textContent = "Offline (Waiting for partner...)";
+                    // Retry connecting every 5 seconds if partner is offline
+                    setTimeout(() => connectToPartner(partnerId), 5000);
+                } else {
+                    ui.chatStatus.textContent = "Network Error";
                 }
             });
-
+            
             peer.on('disconnected', () => {
-                console.warn("Disconnected from PeerJS server.");
-                statusMsg.textContent = "Disconnected. Trying to reconnect...";
-                statusMsg.classList.add('text-red-500');
-                callBtn.disabled = true;
-                // Workaround for peerjs reconnection bug
-                peer.id = peerId;
-                peer._lastServerId = peerId;
-                peer.reconnect();
+                ui.chatStatus.textContent = "Reconnecting...";
+                if(peer) peer.reconnect();
             });
-
-            // Listen for incoming calls
-            peer.on('call', handleIncomingCall);
         }
 
-        // Set Custom ID logic
-        setIdBtn.addEventListener('click', () => {
-            const newId = myIdInput.value.trim();
-            if (newId) {
-                callBtn.disabled = true;
-                initPeer(newId);
-            }
-        });
+        function connectToPartner(partnerId) {
+            if (dataConn && dataConn.open) return; // Already connected
+            
+            ui.chatStatus.textContent = "Connecting to partner...";
+            const conn = peer.connect(partnerId, { reliable: true });
+            setupDataConnection(conn);
+        }
 
-        // Copy ID logic
-        copyIdBtn.addEventListener('click', () => {
-            const idToCopy = myIdInput.value;
-            if (idToCopy && idToCopy !== "Generating..." && idToCopy !== "Blocked in Preview") {
-                // Secure clipboard API fallback for iframe/legacy
-                try {
-                    navigator.clipboard.writeText(idToCopy).then(() => {
-                        const originalHtml = copyIdBtn.innerHTML;
-                        copyIdBtn.innerHTML = '<i class="ph ph-check text-lg text-green-400"></i>';
-                        setTimeout(() => copyIdBtn.innerHTML = originalHtml, 2000);
-                    });
-                } catch(e) {
-                    // Fallback
-                    const textArea = document.createElement("textarea");
-                    textArea.value = idToCopy;
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    document.execCommand("copy");
-                    document.body.removeChild(textArea);
-                    const originalHtml = copyIdBtn.innerHTML;
-                    copyIdBtn.innerHTML = '<i class="ph ph-check text-lg text-green-400"></i>';
-                    setTimeout(() => copyIdBtn.innerHTML = originalHtml, 2000);
+        function setupDataConnection(conn) {
+            dataConn = conn;
+            
+            conn.on('open', () => {
+                ui.chatStatus.textContent = "Online";
+                // Send all unread acks if any (simplified: just send a ping)
+                conn.send({ type: 'ping' });
+            });
+
+            conn.on('data', (data) => {
+                handleIncomingData(data);
+            });
+
+            conn.on('close', () => {
+                ui.chatStatus.textContent = "Offline";
+                dataConn = null;
+                // Try to reconnect
+                setTimeout(() => connectToPartner(inputs.partnerId.value), 3000);
+            });
+        }
+
+        function handleIncomingData(data) {
+            if (data.type === 'ping') {
+                // Just an online check
+                return;
+            }
+            if (data.type === 'msg') {
+                // Received a message
+                renderMessage(data.id, data.text, data.timestamp, 'rcvd', null);
+                
+                // Send Delivery Ack
+                if (dataConn && dataConn.open) {
+                    let status = document.visibilityState === 'visible' ? 'read' : 'delivered';
+                    dataConn.send({ type: 'ack', msgId: data.id, status: status });
                 }
             }
+            if (data.type === 'ack') {
+                // Update tick marks for our sent messages
+                updateMessageTicks(data.msgId, data.status);
+            }
+        }
+
+        // Detect window focus to send "Read" acks
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible" && dataConn && dataConn.open) {
+                // In a full app, track which messages are unread and send acks. 
+                // Here we'll just send a general "read-all" ping.
+                dataConn.send({ type: 'read-all' });
+                // Convert all delivered ticks to read ticks visually
+                document.querySelectorAll('.tick-delivered').forEach(el => {
+                    el.className = 'ph-bold ph-checks text-blue-500 tick-read text-[14px]';
+                });
+            }
         });
 
-        // Initiate a call
-        callBtn.addEventListener('click', () => {
-            const remoteId = remoteIdInput.value.trim();
-            if (!remoteId) {
-                statusMsg.textContent = "Please enter a valid remote ID.";
-                return;
+        btn.send.addEventListener('click', sendMessage);
+        inputs.msg.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
             }
-            if (remoteId === myIdInput.value) {
-                statusMsg.textContent = "You cannot call yourself.";
-                return;
-            }
-            if (!peer || peer.disconnected) {
-                 statusMsg.textContent = "Not connected to network. Wait...";
-                 return;
-            }
+        });
+
+        function sendMessage() {
+            const text = inputs.msg.value.trim();
+            if (!text) return;
             
-            statusMsg.textContent = "Calling...";
-            const call = peer.call(remoteId, localStream);
-            if(call) {
-                setupCallEventHandlers(call);
-            } else {
-                 statusMsg.textContent = "Failed to initiate call.";
-                 setTimeout(() => { statusMsg.textContent = "Ready to connect."; }, 3000);
-            }
-        });
+            const msgId = 'msg-' + Date.now();
+            const timestamp = new Date();
+            
+            // 1. Render immediately as Pending (Clock)
+            renderMessage(msgId, text, timestamp, 'sent', 'pending');
+            inputs.msg.value = '';
+            inputs.msg.style.height = 'auto'; // reset height
 
-        // Handle incoming calls
+            // 2. Send via PeerJS
+            if (dataConn && dataConn.open) {
+                dataConn.send({
+                    type: 'msg',
+                    id: msgId,
+                    text: text,
+                    timestamp: timestamp.getTime()
+                });
+                // Once sent over network, update to Sent (1 Tick)
+                updateMessageTicks(msgId, 'sent');
+            } else {
+                // If offline, it stays pending until reconnected
+                // We'll queue it (simplified for this demo by letting it fail or stay pending)
+                ui.chatStatus.textContent = "Offline - Waiting to connect...";
+            }
+        }
+
+        function formatTime(dateObj) {
+            const d = new Date(dateObj);
+            let h = d.getHours();
+            let m = d.getMinutes();
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12;
+            h = h ? h : 12; // the hour '0' should be '12'
+            m = m < 10 ? '0'+m : m;
+            return `${h}:${m} ${ampm}`;
+        }
+
+        function renderMessage(id, text, timestamp, type, status) {
+            const isSent = type === 'sent';
+            
+            // Format text (convert newlines to <br>)
+            const formattedText = text.replace(/\n/g, '<br>');
+            
+            // Build Ticks HTML
+            let ticksHtml = '';
+            if (isSent) {
+                ticksHtml = getTickHtml(status);
+            }
+
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex w-full ${isSent ? 'justify-end' : 'justify-start'} mb-1`;
+            
+            const bubble = document.createElement('div');
+            bubble.id = id;
+            bubble.className = `relative max-w-[80%] px-2.5 py-1.5 rounded-lg shadow-sm text-[15px] text-gray-800 break-words
+                ${isSent ? 'bg-wa-sent rounded-tr-none bubble-tail-sent' : 'bg-wa-rcvd rounded-tl-none bubble-tail-rcvd'}`;
+            
+            bubble.innerHTML = `
+                <div class="mr-1">${formattedText}</div>
+                <div class="flex items-center justify-end gap-1 mt-0.5 opacity-80">
+                    <span class="text-[10px] text-gray-500">${formatTime(timestamp)}</span>
+                    <span class="ticks-container">${ticksHtml}</span>
+                </div>
+            `;
+            
+            wrapper.appendChild(bubble);
+            ui.messagesArea.appendChild(wrapper);
+            
+            // Scroll to bottom
+            ui.messagesArea.scrollTop = ui.messagesArea.scrollHeight;
+        }
+
+        function getTickHtml(status) {
+            if (status === 'pending') return '<i class="ph-bold ph-clock text-gray-400 text-[14px]"></i>';
+            if (status === 'sent') return '<i class="ph-bold ph-check text-gray-400 text-[14px]"></i>';
+            if (status === 'delivered') return '<i class="ph-bold ph-checks text-gray-400 tick-delivered text-[14px]"></i>';
+            if (status === 'read') return '<i class="ph-bold ph-checks text-blue-500 tick-read text-[14px]"></i>';
+            return '';
+        }
+
+        function updateMessageTicks(msgId, status) {
+            const bubble = document.getElementById(msgId);
+            if (bubble) {
+                const tickContainer = bubble.querySelector('.ticks-container');
+                if (tickContainer) {
+                    tickContainer.innerHTML = getTickHtml(status);
+                }
+            }
+        }
+
+        async function getMediaStream(video = true) {
+            try {
+                return await navigator.mediaDevices.getUserMedia({ video: video, audio: true });
+            } catch (err) {
+                console.error("Media Error:", err);
+                alert("Could not access camera/microphone.");
+                return null;
+            }
+        }
+
+        btn.videoCall.addEventListener('click', () => initiateCall(true));
+        btn.audioCall.addEventListener('click', () => initiateCall(false));
+
+        async function initiateCall(withVideo) {
+            const partnerId = inputs.partnerId.value;
+            if (!peer || !partnerId || ui.chatStatus.textContent === "Offline") {
+                alert("Partner is offline or connecting...");
+                return;
+            }
+
+            localStream = await getMediaStream(withVideo);
+            if (!localStream) return;
+
+            ui.localVideo.srcObject = localStream;
+            ui.callPartnerDisplay.textContent = "Calling " + partnerId + "...";
+            ui.callDuration.textContent = "Ringing...";
+            
+            if(!withVideo) {
+                ui.localVideoContainer.classList.add('hidden');
+                ui.videoIcon.classList.replace('ph-video-camera', 'ph-video-camera-slash');
+                isVideoOff = true;
+            } else {
+                ui.localVideoContainer.classList.remove('hidden');
+                ui.videoIcon.classList.replace('ph-video-camera-slash', 'ph-video-camera');
+                isVideoOff = false;
+            }
+
+            screens.chat.classList.add('hidden');
+            screens.call.classList.remove('hidden');
+
+            const call = peer.call(partnerId, localStream, {
+                metadata: { type: withVideo ? 'video' : 'audio' }
+            });
+            
+            setupCallHandlers(call);
+        }
+
         function handleIncomingCall(call) {
-            // If already in a call, reject automatically
-            if (currentCall) {
+            if (mediaCall || pendingCall) {
                 call.close();
                 return;
             }
             
-            pendingIncomingCall = call;
-            callerIdDisplay.textContent = call.peer;
-            incomingCallModal.classList.remove('hidden');
+            pendingCall = call;
+            ui.callerIdDisplay.textContent = call.peer;
+            screens.incomingCall.classList.remove('hidden');
+            
+            const isVideo = call.metadata && call.metadata.type === 'video';
+            if(!isVideo) {
+                // If it's audio only, maybe update UI slightly
+                ui.callerIdDisplay.nextElementSibling.textContent = "Incoming audio call";
+            }
         }
 
-        // Accept Call
-        acceptCallBtn.addEventListener('click', () => {
-            if (pendingIncomingCall) {
-                pendingIncomingCall.answer(localStream); // Answer with our local stream
-                setupCallEventHandlers(pendingIncomingCall);
-                incomingCallModal.classList.add('hidden');
-                pendingIncomingCall = null;
+        btn.acceptCall.addEventListener('click', async () => {
+            if (!pendingCall) return;
+            
+            const isVideo = pendingCall.metadata && pendingCall.metadata.type === 'video';
+            localStream = await getMediaStream(isVideo);
+            
+            if (localStream) {
+                ui.localVideo.srcObject = localStream;
+                if(!isVideo) ui.localVideoContainer.classList.add('hidden');
+                else ui.localVideoContainer.classList.remove('hidden');
+                
+                pendingCall.answer(localStream);
+                setupCallHandlers(pendingCall);
+                
+                screens.incomingCall.classList.add('hidden');
+                screens.chat.classList.add('hidden');
+                screens.call.classList.remove('hidden');
+                
+                pendingCall = null;
+            } else {
+                pendingCall.close();
+                screens.incomingCall.classList.add('hidden');
+                pendingCall = null;
             }
         });
 
-        // Reject Call
-        rejectCallBtn.addEventListener('click', () => {
-            if (pendingIncomingCall) {
-                pendingIncomingCall.close();
-                incomingCallModal.classList.add('hidden');
-                pendingIncomingCall = null;
+        btn.rejectCall.addEventListener('click', () => {
+            if (pendingCall) {
+                pendingCall.close();
+                screens.incomingCall.classList.add('hidden');
+                pendingCall = null;
             }
         });
 
-        // Common Call Event Handlers (used for caller and receiver)
-        function setupCallEventHandlers(call) {
-            currentCall = call;
+        function setupCallHandlers(call) {
+            mediaCall = call;
+            ui.callPartnerDisplay.textContent = call.peer;
             
             call.on('stream', (remoteStream) => {
-                // When we receive the remote stream, play it and switch UI
-                remoteVideo.srcObject = remoteStream;
-                switchToCallScreen();
+                ui.remoteVideo.srcObject = remoteStream;
+                startCallTimer();
             });
 
             call.on('close', () => {
-                endCall();
+                endCallUI();
             });
 
             call.on('error', (err) => {
-                console.error("Call Error:", err);
-                endCall();
+                console.error("Call error:", err);
+                endCallUI();
             });
         }
 
-        // UI Switching
-        function switchToCallScreen() {
-            setupScreen.classList.add('hidden');
-            callScreen.classList.remove('hidden');
+        function startCallTimer() {
+            callSeconds = 0;
+            clearInterval(callInterval);
+            callInterval = setInterval(() => {
+                callSeconds++;
+                const m = Math.floor(callSeconds / 60).toString().padStart(2, '0');
+                const s = (callSeconds % 60).toString().padStart(2, '0');
+                ui.callDuration.textContent = `${m}:${s}`;
+            }, 1000);
         }
 
-        function switchToSetupScreen() {
-            callScreen.classList.add('hidden');
-            setupScreen.classList.remove('hidden');
-            statusMsg.textContent = "Call ended.";
-            setTimeout(() => { if(statusMsg.textContent === "Call ended.") statusMsg.textContent = "Ready to connect."; }, 3000);
+        function endCallUI() {
+            clearInterval(callInterval);
+            ui.callDuration.textContent = "Call Ended";
+            
+            setTimeout(() => {
+                if (mediaCall) {
+                    mediaCall.close();
+                    mediaCall = null;
+                }
+                if (localStream) {
+                    localStream.getTracks().forEach(track => track.stop());
+                    localStream = null;
+                }
+                ui.remoteVideo.srcObject = null;
+                ui.localVideo.srcObject = null;
+                
+                screens.call.classList.add('hidden');
+                screens.chat.classList.remove('hidden');
+            }, 1500);
         }
 
-        // End Call Function
-        function endCall() {
-            if (currentCall) {
-                currentCall.close();
-                currentCall = null;
-            }
-            if (remoteVideo.srcObject) {
-                remoteVideo.srcObject.getTracks().forEach(track => track.stop());
-                remoteVideo.srcObject = null;
-            }
-            switchToSetupScreen();
-        }
+        btn.endCall.addEventListener('click', () => {
+            if(mediaCall) mediaCall.close(); // Triggers the 'close' event handler
+            else endCallUI(); // Force end if connection wasn't fully established
+        });
 
-        endCallBtn.addEventListener('click', endCall);
-
-        // Media Controls (Toggle Mic)
-        toggleMicBtn.addEventListener('click', () => {
+        btn.toggleMic.addEventListener('click', () => {
             if (localStream) {
                 isAudioMuted = !isAudioMuted;
-                localStream.getAudioTracks()[0].enabled = !isAudioMuted;
+                localStream.getAudioTracks().forEach(t => t.enabled = !isAudioMuted);
                 
                 if (isAudioMuted) {
-                    micIcon.classList.remove('ph-microphone');
-                    micIcon.classList.add('ph-microphone-slash', 'text-red-500');
-                    toggleMicBtn.classList.add('bg-gray-700');
+                    ui.micIcon.classList.replace('ph-microphone', 'ph-microphone-slash');
+                    btn.toggleMic.classList.replace('bg-gray-700/80', 'bg-red-500/80');
                 } else {
-                    micIcon.classList.remove('ph-microphone-slash', 'text-red-500');
-                    micIcon.classList.add('ph-microphone');
-                    toggleMicBtn.classList.remove('bg-gray-700');
+                    ui.micIcon.classList.replace('ph-microphone-slash', 'ph-microphone');
+                    btn.toggleMic.classList.replace('bg-red-500/80', 'bg-gray-700/80');
                 }
             }
         });
 
-        // Media Controls (Toggle Camera)
-        toggleVideoBtn.addEventListener('click', () => {
+        btn.toggleVideo.addEventListener('click', () => {
             if (localStream) {
                 isVideoOff = !isVideoOff;
-                localStream.getVideoTracks()[0].enabled = !isVideoOff;
+                localStream.getVideoTracks().forEach(t => t.enabled = !isVideoOff);
                 
                 if (isVideoOff) {
-                    videoIcon.classList.remove('ph-video-camera');
-                    videoIcon.classList.add('ph-video-camera-slash', 'text-red-500');
-                    toggleVideoBtn.classList.add('bg-gray-700');
+                    ui.videoIcon.classList.replace('ph-video-camera', 'ph-video-camera-slash');
+                    btn.toggleVideo.classList.replace('bg-gray-700/80', 'bg-red-500/80');
+                    ui.localVideoContainer.classList.add('hidden');
                 } else {
-                    videoIcon.classList.remove('ph-video-camera-slash', 'text-red-500');
-                    videoIcon.classList.add('ph-video-camera');
-                    toggleVideoBtn.classList.remove('bg-gray-700');
+                    ui.videoIcon.classList.replace('ph-video-camera-slash', 'ph-video-camera');
+                    btn.toggleVideo.classList.replace('bg-red-500/80', 'bg-gray-700/80');
+                    ui.localVideoContainer.classList.remove('hidden');
                 }
             }
         });
-
-        // Start initialization on window load
-        window.onload = init;
 
     </script>
 </body>

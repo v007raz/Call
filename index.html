@@ -25,6 +25,7 @@
     </script>
     
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- PeerJS Updated to stable cloud host -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
     <style>
@@ -115,7 +116,7 @@
                 <button id="btn-cancel-reply" class="p-2 text-gray-500 hover:text-gray-700"><i class="ph-bold ph-x text-lg"></i></button>
             </div>
 
-            <!-- Input Area (Fixed to bottom securely) -->
+            <!-- Input Area -->
             <div id="input-container" class="shrink-0 bg-[#f0f2f5] px-2 py-2 flex items-end gap-2 z-20 w-full" style="padding-bottom: env(safe-area-inset-bottom, 8px);">
                 <div class="flex-1 bg-white rounded-2xl flex items-end shadow-sm border border-gray-200 relative overflow-hidden">
                     <button class="p-3 text-gray-500"><i class="ph ph-smiley text-xl text-gray-400"></i></button>
@@ -148,6 +149,33 @@
             </div>
         </div>
 
+        <!-- Call Screen -->
+        <div id="call-screen" class="hidden absolute inset-0 bg-gray-900 z-[80] flex flex-col relative">
+            <video id="remote-video" autoplay playsinline class="w-full h-full object-cover"></video>
+            <div id="local-video-container" class="absolute top-16 right-4 w-28 aspect-[3/4] bg-gray-800 rounded-xl overflow-hidden border-2 border-gray-700 z-30">
+                <video id="local-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+            </div>
+            <div class="absolute top-0 left-0 w-full p-6 bg-gradient-to-b from-black/70 flex flex-col items-center z-20">
+                <h3 id="call-partner-display" class="text-white text-lg font-semibold">Partner</h3>
+                <p id="call-duration" class="text-gray-300 text-sm">Calling...</p>
+            </div>
+            <div class="absolute bottom-10 w-full flex justify-center gap-6 z-40">
+                <button id="toggle-mic-btn" class="w-14 h-14 rounded-full bg-gray-700/80 text-white flex items-center justify-center"><i class="ph-fill ph-microphone text-2xl" id="mic-icon"></i></button>
+                <button id="end-call-btn" class="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center"><i class="ph-fill ph-phone-disconnect text-3xl"></i></button>
+                <button id="toggle-video-btn" class="w-14 h-14 rounded-full bg-gray-700/80 text-white flex items-center justify-center"><i class="ph-fill ph-video-camera text-2xl" id="video-icon"></i></button>
+            </div>
+        </div>
+
+        <!-- Incoming Call Modal -->
+        <div id="incoming-call-modal" class="hidden absolute inset-0 bg-gray-900/95 z-[90] flex flex-col items-center justify-center">
+            <div class="w-24 h-24 bg-wa-lightTeal rounded-full flex items-center justify-center animate-pulse"><i class="ph-fill ph-phone-ringing text-5xl text-white"></i></div>
+            <h2 class="text-white text-2xl font-bold mt-6 mb-2" id="incoming-caller-id">Caller</h2>
+            <div class="flex gap-12 mt-12">
+                <button id="reject-call-btn" class="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white"><i class="ph-fill ph-phone-disconnect text-2xl"></i></button>
+                <button id="accept-call-btn" class="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center text-white"><i class="ph-fill ph-phone text-2xl"></i></button>
+            </div>
+        </div>
+
         <!-- Modals -->
         <div id="msg-action-modal" class="hidden absolute inset-0 bg-black/40 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
             <div class="bg-white rounded-xl w-full max-w-[280px] flex flex-col overflow-hidden shadow-2xl">
@@ -168,32 +196,6 @@
                     <button id="btn-confirm-cancel" class="px-4 py-2 text-wa-teal font-medium rounded">Cancel</button>
                     <button id="btn-confirm-clear" class="px-4 py-2 bg-wa-teal text-white font-medium rounded">Clear Chat</button>
                 </div>
-            </div>
-        </div>
-        
-        <!-- Call Screen -->
-        <div id="call-screen" class="hidden absolute inset-0 bg-gray-900 z-[80] flex flex-col relative">
-            <video id="remote-video" autoplay playsinline class="w-full h-full object-cover"></video>
-            <div id="local-video-container" class="absolute top-16 right-4 w-28 aspect-[3/4] bg-gray-800 rounded-xl overflow-hidden border-2 border-gray-700 z-30">
-                <video id="local-video" autoplay playsinline muted class="w-full h-full object-cover"></video>
-            </div>
-            <div class="absolute top-0 left-0 w-full p-6 bg-gradient-to-b from-black/70 flex flex-col items-center z-20">
-                <h3 id="call-partner-display" class="text-white text-lg font-semibold">Partner</h3>
-                <p id="call-duration" class="text-gray-300 text-sm">Calling...</p>
-            </div>
-            <div class="absolute bottom-10 w-full flex justify-center gap-6 z-40">
-                <button id="toggle-mic-btn" class="w-14 h-14 rounded-full bg-gray-700/80 text-white flex items-center justify-center"><i class="ph-fill ph-microphone text-2xl" id="mic-icon"></i></button>
-                <button id="end-call-btn" class="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center"><i class="ph-fill ph-phone-disconnect text-3xl"></i></button>
-                <button id="toggle-video-btn" class="w-14 h-14 rounded-full bg-gray-700/80 text-white flex items-center justify-center"><i class="ph-fill ph-video-camera text-2xl" id="video-icon"></i></button>
-            </div>
-        </div>
-
-        <div id="incoming-call-modal" class="hidden absolute inset-0 bg-gray-900/95 z-[90] flex flex-col items-center justify-center">
-            <div class="w-24 h-24 bg-wa-lightTeal rounded-full flex items-center justify-center animate-pulse"><i class="ph-fill ph-phone-ringing text-5xl text-white"></i></div>
-            <h2 class="text-white text-2xl font-bold mt-6 mb-2" id="incoming-caller-id">Caller</h2>
-            <div class="flex gap-12 mt-12">
-                <button id="reject-call-btn" class="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white"><i class="ph-fill ph-phone-disconnect text-2xl"></i></button>
-                <button id="accept-call-btn" class="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center text-white"><i class="ph-fill ph-phone text-2xl"></i></button>
             </div>
         </div>
     </div>
@@ -225,13 +227,17 @@
         let localChatStore = []; let selectedMsgObj = null;
         let replyingToObj = null; let editingMsgObj = null;
 
+        // PeerJS variables
+        let peer = null; let mediaCall = null; let pendingCall = null; let localStream = null;
+
         const ui = {
             login: document.getElementById('login-screen'), chat: document.getElementById('chat-screen'),
             messages: document.getElementById('chat-messages'), dropdown: document.getElementById('chat-dropdown'),
             msgModal: document.getElementById('msg-action-modal'), confirmModal: document.getElementById('confirm-modal'),
             uploadBar: document.getElementById('upload-progress-bar'), uploadPercent: document.getElementById('upload-percent'),
             replyBox: document.getElementById('reply-preview-box'),
-            viewerModal: document.getElementById('image-viewer-modal'), viewerImg: document.getElementById('viewer-img'), viewerDownload: document.getElementById('viewer-download-btn')
+            viewerModal: document.getElementById('image-viewer-modal'), viewerImg: document.getElementById('viewer-img'), viewerDownload: document.getElementById('viewer-download-btn'),
+            callScreen: document.getElementById('call-screen'), incomingModal: document.getElementById('incoming-call-modal')
         };
         const inputs = {
             myId: document.getElementById('my-id-input'), partnerId: document.getElementById('partner-id-input'),
@@ -244,12 +250,13 @@
             cancelAction: document.getElementById('btn-action-cancel'), reply: document.getElementById('btn-reply-msg'),
             edit: document.getElementById('btn-edit-msg'), cancelReply: document.getElementById('btn-cancel-reply'),
             confirmClear: document.getElementById('btn-confirm-clear'), cancelClear: document.getElementById('btn-confirm-cancel'),
-            closeViewer: document.getElementById('close-viewer')
+            closeViewer: document.getElementById('close-viewer'),
+            videoCall: document.getElementById('btn-video-call'), audioCall: document.getElementById('btn-audio-call'),
+            acceptCall: document.getElementById('accept-call-btn'), rejectCall: document.getElementById('reject-call-btn'), endCall: document.getElementById('end-call-btn')
         };
 
         if(myId) { inputs.myId.value = myId; }
 
-        // --- Stable Mobile Viewport & Keyboard Lock Fix ---
         function setupMobileViewportFix() {
             const appContainer = document.getElementById('app-container');
             const adjustHeight = () => {
@@ -292,16 +299,17 @@
             }, 300);
             startChatSync();
             startPresenceSync();
+            initPeer(myId);
         });
 
         btn.back.addEventListener('click', () => {
             if(unsubscribeChat) { unsubscribeChat(); unsubscribeChat = null; }
             if(presenceInterval) { clearInterval(presenceInterval); presenceInterval = null; }
+            if(peer) { peer.destroy(); peer = null; }
             updateMyPresence(false);
             ui.chat.classList.add('hidden'); ui.login.classList.remove('hidden');
         });
 
-        // --- Bulletproof Real-time Presence (Online / Last Seen) ---
         async function updateMyPresence(isOnline) {
             if(!myId || !currentUserUid) return;
             try {
@@ -313,14 +321,14 @@
         function startPresenceSync() {
             updateMyPresence(true);
             if(presenceInterval) clearInterval(presenceInterval);
-            presenceInterval = setInterval(() => updateMyPresence(true), 8000); // Heartbeat every 8s
+            presenceInterval = setInterval(() => updateMyPresence(true), 6000);
 
             const partnerRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence_' + partnerId);
             onSnapshot(partnerRef, (docSnap) => {
                 const statusEl = document.getElementById('chat-status');
                 if(docSnap.exists()) {
                     const data = docSnap.data();
-                    const isOnline = data.online && (Date.now() - data.lastSeen < 20000); // 20s window
+                    const isOnline = data.online && (Date.now() - data.lastSeen < 18000);
                     if(isOnline) {
                         statusEl.textContent = "Online";
                         statusEl.classList.add('font-bold', 'text-white');
@@ -338,6 +346,119 @@
                 }
             });
         }
+
+        // --- PeerJS Calling Setup ---
+        function initPeer(id) {
+            if(peer) peer.destroy();
+            // Using PeerJS official free cloud server configuration
+            peer = new Peer(id, {
+                host: '0.peerjs.com',
+                port: 443,
+                secure: true,
+                debug: 1
+            });
+            peer.on('open', () => console.log("Peer Connected"));
+            peer.on('call', handleIncomingCall);
+        }
+
+        async function getMediaStream(video = true) {
+            try { return await navigator.mediaDevices.getUserMedia({ video: video, audio: true }); }
+            catch (err) { alert("Camera/Microphone access blocked or unavailable."); return null; }
+        }
+
+        btn.videoCall.addEventListener('click', () => initiateCall(true));
+        btn.audioCall.addEventListener('click', () => initiateCall(false));
+
+        async function initiateCall(withVideo) {
+            if (!peer || !partnerId) return;
+            localStream = await getMediaStream(withVideo);
+            if (!localStream) return;
+
+            document.getElementById('local-video').srcObject = localStream;
+            document.getElementById('call-partner-display').textContent = "Calling " + partnerId + "...";
+            document.getElementById('call-duration').textContent = "Ringing...";
+            
+            const vidContainer = document.getElementById('local-video-container');
+            if(!withVideo) vidContainer.classList.add('hidden'); else vidContainer.classList.remove('hidden');
+
+            ui.chat.classList.add('hidden');
+            ui.callScreen.classList.remove('hidden');
+
+            const call = peer.call(partnerId, localStream, { metadata: { type: withVideo ? 'video' : 'audio' } });
+            setupCallHandlers(call);
+        }
+
+        function handleIncomingCall(call) {
+            if (mediaCall || pendingCall) { call.close(); return; }
+            pendingCall = call;
+            document.getElementById('incoming-caller-id').textContent = call.peer;
+            ui.incomingModal.classList.remove('hidden');
+        }
+
+        btn.acceptCall.addEventListener('click', async () => {
+            if (!pendingCall) return;
+            const isVideo = pendingCall.metadata && pendingCall.metadata.type === 'video';
+            localStream = await getMediaStream(isVideo);
+            
+            if (localStream) {
+                document.getElementById('local-video').srcObject = localStream;
+                if(!isVideo) document.getElementById('local-video-container').classList.add('hidden');
+                else document.getElementById('local-video-container').classList.remove('hidden');
+                
+                pendingCall.answer(localStream);
+                setupCallHandlers(pendingCall);
+                
+                ui.incomingModal.classList.add('hidden');
+                ui.chat.classList.add('hidden');
+                ui.callScreen.classList.remove('hidden');
+                pendingCall = null;
+            } else {
+                pendingCall.close();
+                ui.incomingModal.classList.add('hidden');
+                pendingCall = null;
+            }
+        });
+
+        btn.rejectCall.addEventListener('click', () => {
+            if (pendingCall) { pendingCall.close(); ui.incomingModal.classList.add('hidden'); pendingCall = null; }
+        });
+
+        let callInterval = null; let callSeconds = 0;
+        function setupCallHandlers(call) {
+            mediaCall = call;
+            document.getElementById('call-partner-display').textContent = call.peer;
+            call.on('stream', (remoteStream) => {
+                document.getElementById('remote-video').srcObject = remoteStream;
+                startCallTimer();
+            });
+            call.on('close', endCallUI);
+            call.on('error', endCallUI);
+        }
+
+        function startCallTimer() {
+            callSeconds = 0; clearInterval(callInterval);
+            callInterval = setInterval(() => {
+                callSeconds++;
+                const m = Math.floor(callSeconds / 60).toString().padStart(2, '0');
+                const s = (callSeconds % 60).toString().padStart(2, '0');
+                document.getElementById('call-duration').textContent = `${m}:${s}`;
+            }, 1000);
+        }
+
+        function endCallUI() {
+            clearInterval(callInterval);
+            document.getElementById('call-duration').textContent = "Call Ended";
+            setTimeout(() => {
+                if (mediaCall) { mediaCall.close(); mediaCall = null; }
+                if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+                document.getElementById('remote-video').srcObject = null;
+                document.getElementById('local-video').srcObject = null;
+                ui.callScreen.classList.add('hidden');
+                ui.chat.classList.remove('hidden');
+            }, 1200);
+        }
+
+        btn.endCall.addEventListener('click', () => { if(mediaCall) mediaCall.close(); else endCallUI(); });
 
         function startChatSync() {
             if(!currentUserUid) return;
@@ -426,11 +547,10 @@
                 replyingToObj = null; ui.replyBox.classList.add('hidden');
             }
 
-            try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, docId), msgData); } catch (e) { alert("Send failed! File size too large for database."); }
+            try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chat_' + currentRoomId, docId), msgData); } catch (e) { alert("Send failed! File size too large."); }
             setTimeout(() => ui.messages.scrollTop = ui.messages.scrollHeight, 50);
         }
 
-        // --- Advanced Auto-Compressor for Database Safety (< 600KB Guaranteed) ---
         inputs.media.addEventListener('change', async (e) => {
             const file = e.target.files[0]; if(!file) return;
 
@@ -445,7 +565,7 @@
                     img.onload = async function() {
                         const canvas = document.createElement('canvas');
                         let width = img.width; let height = img.height;
-                        const maxDim = 600; // Aggressive resize to strictly fit Firestore 1MB doc limit
+                        const maxDim = 600;
                         if (width > height && width > maxDim) { height *= maxDim / width; width = maxDim; }
                         else if (height > maxDim) { width *= maxDim / height; height = maxDim; }
                         
@@ -462,11 +582,10 @@
                     }
                 }
             } else {
-                // For videos / PDFs: check size limit
                 if(file.size > 600 * 1024) {
                     ui.uploadBar.classList.add('hidden');
                     inputs.media.value = '';
-                    return alert("⚠️ File size is larger than 600KB! Please share videos via a quick link or compress below 600KB to send directly.");
+                    return alert("⚠️ File size is larger than 600KB! Please share videos via link or compress below 600KB.");
                 }
                 const reader = new FileReader();
                 reader.readAsDataURL(file);

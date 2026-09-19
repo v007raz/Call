@@ -116,7 +116,7 @@
             </div>
 
             <!-- Input Area -->
-            <div id="input-container" class="shrink-0 bg-[#f0f2f5] px-2 py-2 flex items-end gap-2 z-20 w-full" style="padding-bottom: max(env(safe-area-inset-bottom), 8px);">
+            <div id="input-container" class="shrink-0 bg-[#f0f2f5] px-2 py-2 flex items-end gap-2 z-20 w-full">
                 <div class="flex-1 bg-white rounded-2xl flex items-end shadow-sm border border-gray-200 relative overflow-hidden">
                     <button class="p-3 text-gray-500"><i class="ph ph-smiley text-xl text-gray-400"></i></button>
                     <textarea id="msg-input" rows="1" class="flex-1 bg-transparent py-3 focus:outline-none resize-none max-h-28 text-[15px] text-gray-800" placeholder="Message"></textarea>
@@ -255,16 +255,13 @@
 
         if(myId) { inputs.myId.value = myId; }
 
-        // --- Perfect Viewport and Keyboard Alignment Fix ---
+        // --- Direct Viewport Height Fix for Mobile Keyboards ---
         function setupMobileViewportFix() {
             const appContainer = document.getElementById('app-container');
             const adjustHeight = () => {
                 const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
                 appContainer.style.height = `${height}px`;
                 window.scrollTo(0, 0);
-                if(!ui.chat.classList.contains('hidden')) {
-                    ui.messages.scrollTop = ui.messages.scrollHeight;
-                }
             };
             window.visualViewport?.addEventListener('resize', adjustHeight);
             window.visualViewport?.addEventListener('scroll', adjustHeight);
@@ -320,14 +317,15 @@
         function startPresenceSync() {
             updateMyPresence(true);
             if(presenceInterval) clearInterval(presenceInterval);
-            presenceInterval = setInterval(() => updateMyPresence(true), 6000);
+            presenceInterval = setInterval(() => updateMyPresence(true), 5000);
 
             const partnerRef = doc(db, 'artifacts', appId, 'public', 'data', 'presence_' + partnerId);
             onSnapshot(partnerRef, (docSnap) => {
                 const statusEl = document.getElementById('chat-status');
                 if(docSnap.exists()) {
                     const data = docSnap.data();
-                    const isOnline = data.online && (Date.now() - data.lastSeen < 18000);
+                    // Agar last seen 15 seconds ke andar update hua hai toh online maanege
+                    const isOnline = data.online && (Date.now() - data.lastSeen < 15000);
                     if(isOnline) {
                         statusEl.textContent = "Online";
                         statusEl.classList.add('font-bold', 'text-white');

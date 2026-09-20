@@ -165,7 +165,6 @@ function render(s) {
     const b = document.createElement("div");
     b.className = "bubble " + (m.senderId === myId ? "sent" : "received");
     
-    // Display reply context clearly inside the bubble
     if (m.replyTo && m.replyTo.text) {
       const repDiv = document.createElement("div");
       repDiv.className = "bg-black/5 border-l-2 border-teal-700 p-1.5 mb-1 text-xs rounded text-gray-700 truncate";
@@ -212,7 +211,7 @@ function render(s) {
     b.ontouchend = e => {
       let diff = e.changedTouches[0].clientX - sx;
       b.style.transform = "translateX(0px)";
-      if (Math.abs(diff) > 35) {
+      if (Math.abs(diff) > 30) {
         triggerReply(m);
       }
     };
@@ -242,7 +241,6 @@ async function send(imgData = null) {
       const d = { text: text || "", senderId: myId, timestamp: Date.now(), status: "sent", deletedFor: [], isDeleted: false };
       if (imgData) d.image = imgData;
       
-      // Save Reply reference reliably
       if (replyTo) { 
         d.replyTo = { 
           id: replyTo.id, 

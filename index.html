@@ -88,6 +88,15 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
     </div>
   </div>
 
+  <!-- Media Full Screen Preview Modal -->
+  <div id="mediaModal" class="screen hidden modal flex flex-col items-center justify-center bg-black/95 p-4 z-50">
+    <img id="previewImg" class="max-w-full max-h-[75vh] object-contain rounded mb-6" />
+    <div class="flex gap-4">
+      <a id="downloadBtn" download="image.png" class="bg-teal-600 text-white px-6 py-3 rounded-full font-bold shadow">Download 📥</a>
+      <button id="closeMedia" class="bg-gray-700 text-white px-6 py-3 rounded-full font-bold shadow">Close ✕</button>
+    </div>
+  </div>
+
   <div id="colors" class="screen hidden modal flex items-center justify-center">
     <div class="bg-white rounded p-5 w-64">
       <b>Background color</b>
@@ -138,6 +147,12 @@ function render(s) {
       const img = document.createElement("img");
       img.src = m.image;
       img.className = "max-w-xs rounded mb-1 cursor-pointer";
+      img.onclick = (e) => {
+        e.stopPropagation();
+        $("previewImg").src = m.image;
+        $("downloadBtn").href = m.image;
+        $("mediaModal").classList.remove("hidden");
+      };
       b.appendChild(img);
       if (m.text) {
         const txt = document.createElement("p");
@@ -312,7 +327,7 @@ $("closeColors").onclick = () => $("colors").classList.add("hidden");
 document.querySelectorAll("[data-bg]").forEach(b => b.onclick = () => { chat.style.background = b.dataset.bg; localStorage.setItem("chat-bg", b.dataset.bg); $("colors").classList.add("hidden"); });
 if (localStorage.getItem("chat-bg")) chat.style.background = localStorage.getItem("chat-bg");
 
-// FULL AND FINAL PERMANENT CLEAR CHAT
+// ROBUST PERMANENT CLEAR CHAT
 $("clearChat").onclick = async () => {
   if (confirm("Clear chat permanently for everyone?")) {
     try {
@@ -322,7 +337,7 @@ $("clearChat").onclick = async () => {
           resolve(snapshot);
         });
       });
-      await Promise.all(snap.docs.map(docSnap => deleteDoc(docSnap.ref)));
+      await Promise.all(snap.docs.map(docSnap => deleteDoc(docSnap.ref).catch(err => console.error("Delete error", err))));
       $("menu").classList.add("hidden");
     } catch (e) {
       fail("Clear chat failed", e);
@@ -339,6 +354,7 @@ $("mediaInput").onchange = e => {
   reader.readAsDataURL(file);
 };
 
+$("closeMedia").onclick = () => $("mediaModal").classList.add("hidden");
 $("cancelReply").onclick = () => { $("replyBox").classList.add("hidden"); replyTo = null; };
 $("closeActions").onclick = () => $("actions").classList.add("hidden");
 $("reply").onclick = () => { replyTo = selected; $("replyText").textContent = "Replying to: " + (selected.text || "media"); $("replyBox").classList.remove("hidden"); $("actions").classList.add("hidden"); };

@@ -167,7 +167,6 @@ function render(s) {
     const b = document.createElement("div");
     b.className = "bubble " + (m.senderId === myId ? "sent" : "received");
     
-    // Display reply context inside the message bubble properly
     if (m.replyTo) {
       const repDiv = document.createElement("div");
       repDiv.className = "bg-black/5 border-l-2 border-teal-700 p-1.5 mb-1 text-xs rounded text-gray-700 truncate";
@@ -202,7 +201,6 @@ function render(s) {
     f.innerHTML = new Date(m.timestamp || 0).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + (m.senderId === myId ? " " + (m.status === "read" ? "<span class='text-blue-600'>✓✓</span>" : m.status === "delivered" ? "✓✓" : "✓") : "");
     b.append(f);
     
-    // Smooth Swipe to Reply (Left & Right support)
     let sx = 0;
     b.ontouchstart = e => sx = e.touches[0].clientX;
     b.ontouchmove = e => {
@@ -238,7 +236,6 @@ async function send(imgData = null) {
       const d = { text: text || "", senderId: myId, timestamp: Date.now(), status: "sent", deletedFor: [], isDeleted: false };
       if (imgData) d.image = imgData;
       
-      // Save reply information correctly to Firebase
       if (replyTo) { 
         d.replyTo = { 
           id: replyTo.id, 
@@ -419,7 +416,12 @@ $("edit").onclick = () => { editing = selected; $("message").value = selected.te
 $("deleteMe").onclick = async () => { if (selected) await updateDoc(doc(C("chat_" + room), selected.id), { deletedFor: [...(selected.deletedFor \vert{}\vert{} []), myId] }); $("actions").classList.add("hidden"); };
 $("deleteAll").onclick = async () => { if (selected) await updateDoc(doc(C("chat_" + room), selected.id), { isDeleted: true, text: "", image: "" }); $("actions").classList.add("hidden"); };
 
-const timer = setTimeout(() => { if (!uid) { $("loginStatus").textContent = "Firebase timeout — check Anonymous Auth"; } }, 12000);
+// Reliable Firebase Connection with explicit handling
+const timer = setTimeout(() => { 
+  if (!uid) { 
+    $("loginStatus").textContent = "Firebase timeout — Check Anonymous Auth in Console"; 
+  } 
+}, 12000);
 
 signInAnonymously(auth).catch(e => fail("Firebase auth failed", e));
 onAuthStateChanged(auth, u => {

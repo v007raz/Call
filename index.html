@@ -27,16 +27,16 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
   </section>
 
   <section id="chat" class="screen hidden flex flex-col" style="background:#efeae2">
-    <header class="bg-teal-700 text-white p-3 flex justify-between">
+    <header class="bg-teal-700 text-white p-3 flex justify-between items-center">
       <div>
         <b id="partnerName">Partner</b>
         <small id="status" class="block">Offline</small>
       </div>
-      <div class="relative">
-        <button id="audioCall">☎</button>
-        <button id="videoCall">▣</button>
-        <button id="menuBtn">⋮</button>
-        <div id="menu" class="hidden absolute right-0 top-8 bg-white text-gray-800 w-48 z-20 shadow">
+      <div class="flex items-center gap-3 relative">
+        <button id="audioCall" class="p-2 text-xl">☎</button>
+        <button id="videoCall" class="p-2 text-xl">▣</button>
+        <button id="menuBtn" class="p-2 text-xl">⋮</button>
+        <div id="menu" class="hidden absolute right-0 top-12 bg-white text-gray-800 w-48 z-20 shadow rounded">
           <button id="clearChat" class="block w-full text-left p-3 border-b">Clear chat</button>
           <button id="bgBtn" class="block w-full text-left p-3">Background color</button>
         </div>
@@ -46,9 +46,11 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
     <div id="replyBox" class="hidden bg-white p-2 text-sm flex justify-between">
       <span id="replyText"></span><button id="cancelReply">✕</button>
     </div>
-    <div class="p-2 bg-gray-100 flex gap-2">
-      <textarea id="message" rows="1" class="flex-1 rounded-2xl p-3" placeholder="Message"></textarea>
-      <button id="send" class="rounded-full bg-teal-700 text-white w-12 h-12">➤</button>
+    <div class="p-2 bg-gray-100 flex items-center gap-2">
+      <input type="file" id="mediaInput" accept="image/*" class="hidden">
+      <button id="mediaBtn" class="rounded-full bg-gray-200 text-gray-700 w-10 h-10 flex items-center justify-center text-lg font-bold">＋</button>
+      <textarea id="message" rows="1" class="flex-1 rounded-2xl p-3 border" placeholder="Message"></textarea>
+      <button id="send" class="rounded-full bg-teal-700 text-white w-12 h-12 flex items-center justify-center">➤</button>
     </div>
   </section>
 
@@ -60,8 +62,9 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
       <b id="callName"></b>
       <p id="callState">Calling…</p>
     </div>
-    <div class="absolute bottom-8 w-full flex justify-center gap-3">
+    <div class="absolute bottom-8 w-full flex justify-center gap-3 flex-wrap px-4">
       <button id="mute" class="bg-gray-700 rounded-full px-4 py-3">🎙 Mute</button>
+      <button id="speaker" class="bg-gray-700 rounded-full px-4 py-3">🔊 Speaker</button>
       <button id="toggleVideo" class="bg-gray-700 rounded-full px-4 py-3">📹 Video</button>
       <button id="end" class="bg-red-600 rounded-full px-4 py-3">End</button>
     </div>
@@ -76,7 +79,7 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
   </div>
 
   <div id="actions" class="screen hidden modal flex items-center justify-center">
-    <div class="bg-white rounded w-64">
+    <div class="bg-white rounded w-64 overflow-hidden">
       <button id="reply" class="w-full text-left p-4 border-b">↩ Reply</button>
       <button id="edit" class="w-full text-left p-4 border-b">✎ Edit</button>
       <button id="deleteMe" class="w-full text-left p-4 border-b">Delete for me</button>
@@ -96,7 +99,7 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
         <button data-bg="#1f2937" class="h-10 bg-gray-800 border"></button>
         <button data-bg="#fef3c7" class="h-10 bg-amber-100 border"></button>
       </div>
-      <button id="closeColors" class="w-full mt-4 p-2 bg-gray-100">Close</button>
+      <button id="closeColors" class="w-full mt-4 p-2 bg-gray-100 rounded">Close</button>
     </div>
   </div>
 </div>
@@ -128,15 +131,32 @@ function render(s) {
     r.className = "flex " + (m.senderId === myId ? "justify-end" : "justify-start");
     const b = document.createElement("div");
     b.className = "bubble " + (m.senderId === myId ? "sent" : "received");
-    b.textContent = m.isDeleted ? (m.senderId === myId ? "You deleted this message" : "This message was deleted") : (m.text || "");
+    
+    if (m.isDeleted) {
+      b.textContent = m.senderId === myId ? "You deleted this message" : "This message was deleted";
+    } else if (m.image) {
+      const img = document.createElement("img");
+      img.src = m.image;
+      img.className = "max-w-xs rounded mb-1 cursor-pointer";
+      b.appendChild(img);
+      if (m.text) {
+        const txt = document.createElement("p");
+        txt.textContent = m.text;
+        b.appendChild(txt);
+      }
+    } else {
+      b.textContent = m.text || "";
+    }
+
     const f = document.createElement("small");
-    f.className = "block text-right text-gray-500";
+    f.className = "block text-right text-gray-500 mt-1";
     f.innerHTML = new Date(m.timestamp || 0).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + (m.senderId === myId ? " " + (m.status === "read" ? "<span class='text-blue-600'>✓✓</span>" : m.status === "delivered" ? "✓✓" : "✓") : "");
     b.append(f);
+    
     let sx = 0;
     b.ontouchstart = e => sx = e.touches[0].clientX;
     b.ontouchend = e => { if (e.changedTouches[0].clientX - sx > 55) { replyTo = m; $("replyText").textContent = "Replying to: " + (m.text || "media"); $("replyBox").classList.remove("hidden"); } };
-    b.onclick = () => { selected = m; $("actions").classList.remove("hidden"); $("edit").classList.toggle("hidden", !(m.senderId === myId && !m.isDeleted)); };
+    b.onclick = () => { selected = m; $("actions").classList.remove("hidden"); $("edit").classList.toggle("hidden", !(m.senderId === myId && !m.isDeleted && !m.image)); };
     r.append(b);
     $("messages").append(r);
     if (m.senderId !== myId && m.status !== "read") updateDoc(doc(C("chat_" + room), m.id), { status: "read" }).catch(() => {});
@@ -144,15 +164,16 @@ function render(s) {
   $("messages").scrollTop = $("messages").scrollHeight;
 }
 
-async function send() {
+async function send(imgData = null) {
   const i = $("message"), text = i.value.trim();
-  if (!text || !uid || !room) return;
+  if (!text && !imgData || !uid || !room) return;
   try {
     if (editing) {
       await updateDoc(doc(C("chat_" + room), editing.id), { text, isEdited: true });
       editing = null;
     } else {
-      const d = { text, senderId: myId, timestamp: Date.now(), status: "sent", deletedFor: [], isDeleted: false };
+      const d = { text: text || "", senderId: myId, timestamp: Date.now(), status: "sent", deletedFor: [], isDeleted: false };
+      if (imgData) d.image = imgData;
       if (replyTo) { d.replyTo = { id: replyTo.id, text: replyTo.text || "media" }; replyTo = null; $("replyBox").classList.add("hidden"); }
       await setDoc(doc(C("chat_" + room), "msg_" + Date.now() + Math.random().toString(36).slice(2, 7)), d);
     }
@@ -215,12 +236,12 @@ function watch(owner) {
   }));
 }
 
-async function media(video) {
+async function mediaStream(video) {
   try { return await navigator.mediaDevices.getUserMedia({ audio: true, video }); } catch (e) { fail("Microphone/Camera permission failed", e); }
 }
 
 async function start(video) {
-  stream = await media(video);
+  stream = await mediaStream(video);
   if (!stream) return;
   callId = room + "_" + Date.now();
   $("local").srcObject = stream;
@@ -247,7 +268,7 @@ async function start(video) {
 
 async function acceptCall() {
   const d = pending;
-  stream = await media(d.type === "video");
+  stream = await mediaStream(d.type === "video");
   if (!stream) return;
   callId = d.callId;
   partnerId = d.caller;
@@ -267,7 +288,7 @@ async function acceptCall() {
 
 $("myId").value = localStorage.getItem("whatsapp_my_id") || "";
 $("connect").onclick = setup;
-$("send").onclick = send;
+$("send").onclick = () => send();
 $("message").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
 $("audioCall").onclick = () => start(false);
 $("videoCall").onclick = () => start(true);
@@ -275,19 +296,55 @@ $("accept").onclick = () => acceptCall().catch(e => fail("Accept call failed", e
 $("reject").onclick = () => { incoming.classList.add("hidden"); if (pending) deleteDoc(D("active_calls", myId)); pending = null; };
 $("end").onclick = reset;
 $("mute").onclick = () => { const t = stream?.getAudioTracks()[0]; if (t) { t.enabled = !t.enabled; $("mute").textContent = t.enabled ? "🎙 Mute" : "🔇 Unmute"; } };
+
+let speakerOn = false;
+$("speaker").onclick = () => {
+  speakerOn = !speakerOn;
+  const remoteVideo = $("remote");
+  if (typeof remoteVideo.sinkId !== 'undefined') {
+    // Advanced audio output switching if supported
+  }
+  remoteVideo.muted = !speakerOn; // basic toggle simulation for mobile audio output
+  $("speaker").textContent = speakerOn ? "🔊 Speaker On" : "🔈 Earpiece";
+};
+
 $("toggleVideo").onclick = () => { const t = stream?.getVideoTracks()[0]; if (t) t.enabled = !t.enabled; };
 $("menuBtn").onclick = () => $("menu").classList.toggle("hidden");
 $("bgBtn").onclick = () => { $("colors").classList.remove("hidden"); $("menu").classList.add("hidden"); };
 $("closeColors").onclick = () => $("colors").classList.add("hidden");
 document.querySelectorAll("[data-bg]").forEach(b => b.onclick = () => { chat.style.background = b.dataset.bg; localStorage.setItem("chat-bg", b.dataset.bg); $("colors").classList.add("hidden"); });
 if (localStorage.getItem("chat-bg")) chat.style.background = localStorage.getItem("chat-bg");
-$("clearChat").onclick = async () => { if (confirm("Clear chat?")) { const s = await new Promise(r => { const u = onSnapshot(query(C("chat_" + room)), x => { u(); r(x); }); }); await Promise.all(s.docs.loc ? s.docs.map(x => updateDoc(x.ref, { deletedFor: [...(x.data().deletedFor || []), myId] }).catch(() => {})) : []); } };
+
+$("clearChat").onclick = async () => {
+  if (confirm("Clear chat?")) {
+    const snap = await new Promise(resolve => {
+      const unsub = onSnapshot(query(C("chat_" + room)), snapshot => {
+        unsub();
+        resolve(snapshot);
+      });
+    });
+    await Promise.all(snap.docs.map(docSnap => 
+      updateDoc(docSnap.ref, { deletedFor: [...(docSnap.data().deletedFor || []), myId] }).catch(() => {})
+    ));
+    $("menu").classList.add("hidden");
+  }
+};
+
+$("mediaBtn").onclick = () => $("mediaInput").click();
+$("mediaInput").onchange = e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = event => send(event.target.result);
+  reader.readAsDataURL(file);
+};
+
 $("cancelReply").onclick = () => { $("replyBox").classList.add("hidden"); replyTo = null; };
 $("closeActions").onclick = () => $("actions").classList.add("hidden");
 $("reply").onclick = () => { replyTo = selected; $("replyText").textContent = "Replying to: " + (selected.text || "media"); $("replyBox").classList.remove("hidden"); $("actions").classList.add("hidden"); };
 $("edit").onclick = () => { editing = selected; $("message").value = selected.text || ""; $("message").focus(); $("actions").classList.add("hidden"); };
 $("deleteMe").onclick = async () => { if (selected) await updateDoc(doc(C("chat_" + room), selected.id), { deletedFor: [...(selected.deletedFor || []), myId] }); $("actions").classList.add("hidden"); };
-$("deleteAll").onclick = async () => { if (selected) await updateDoc(doc(C("chat_" + room), selected.id), { isDeleted: true, text: "" }); $("actions").classList.add("hidden"); };
+$("deleteAll").onclick = async () => { if (selected) await updateDoc(doc(C("chat_" + room), selected.id), { isDeleted: true, text: "", image: "" }); $("actions").classList.add("hidden"); };
 
 const timer = setTimeout(() => { if (!uid) { $("loginStatus").textContent = "Firebase timeout — check Anonymous Auth"; } }, 12000);
 

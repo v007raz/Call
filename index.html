@@ -253,6 +253,7 @@ async function send(imgData = null) {
       await setDoc(doc(C("chat_"+room), "msg_"+Date.now()+Math.random().toString(36).slice(2,7)), d);
     }
     i.value = "";
+    i.focus(); // Keeps keyboard open after sending message
   } catch (e) { fail("Message send failed", e); }
 }
 

@@ -10,11 +10,21 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
 #app{max-width:450px;height:100%;margin:auto;position:relative;overflow:hidden;background:#fff}
 .screen{position:absolute;inset:0}
 .hidden{display:none!important}
-.bubble{max-width:80%;padding:8px 10px;border-radius:10px;word-break:break-word;touch-action:pan-y}
+.bubble{max-width:80%;padding:8px 10px;border-radius:10px;word-break:break-word;position:relative;transition:transform 0.2s ease;}
 .sent{background:#dcf8c6}
 .received{background:#fff}
 .modal{background:#0008;z-index:50}
-.quoted-box { background: rgba(0,0,0,0.05); border-left: 3px solid #0d9488; padding: 4px 8px; margin-bottom: 4px; border-radius: 4px; font-size: 0.85rem; }
+/* Smooth Reply Box Animation */
+#replyBox {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateY(0);
+}
+#replyBox.hidden {
+  transform: translateY(100%);
+  opacity: 0;
+  display: flex !important;
+  pointer-events: none;
+}
 </style>
 </head>
 <body>
@@ -34,8 +44,8 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
         <small id="status" class="block">Offline</small>
       </div>
       <div class="flex items-center gap-3 relative">
-        <button id="audioCall" class="p-2 text-xl">📞</button>
-        <button id="videoCall" class="p-2 text-xl">🎥</button>
+        <button id="audioCall" class="p-2 text-xl">☎</button>
+        <button id="videoCall" class="p-2 text-xl">▣</button>
         <button id="menuBtn" class="p-2 text-xl">⋮</button>
         <div id="menu" class="hidden absolute right-0 top-12 bg-white text-gray-800 w-48 z-20 shadow rounded">
           <button id="clearChat" class="block w-full text-left p-3 border-b text-red-600 font-bold">Clear chat</button>
@@ -44,14 +54,21 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
       </div>
     </header>
     <main id="messages" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2"></main>
-    <div id="replyBox" class="hidden bg-white p-2 text-sm flex justify-between">
-      <span id="replyText"></span><button id="cancelReply">✕</button>
+    
+    <!-- Smooth Reply Box -->
+    <div id="replyBox" class="hidden bg-white p-2.5 text-sm border-l-4 border-teal-700 shadow-inner flex justify-between items-center">
+      <div>
+        <b id="replyTitle" class="text-teal-700 block text-xs">Replying</b>
+        <span id="replyText" class="text-gray-600 truncate block max-w-[320px]"></span>
+      </div>
+      <button id="cancelReply" class="text-gray-500 font-bold px-2 py-1">✕</button>
     </div>
+
     <div class="p-2 bg-gray-100 flex items-center gap-2">
       <input type="file" id="mediaInput" accept="image/*" class="hidden">
-      <button id="mediaBtn" class="rounded-full bg-gray-200 text-gray-700 w-10 h-10 flex items-center justify-center text-lg font-bold">＋</button>
+      <button id="mediaBtn" type="button" class="rounded-full bg-gray-200 text-gray-700 w-10 h-10 flex items-center justify-center text-lg font-bold shrink-0">＋</button>
       <textarea id="message" rows="1" class="flex-1 rounded-2xl p-3 border" placeholder="Message"></textarea>
-      <button id="send" class="rounded-full bg-teal-700 text-white w-12 h-12 flex items-center justify-center">➤</button>
+      <button id="send" class="rounded-full bg-teal-700 text-white w-12 h-12 flex items-center justify-center shrink-0">➤</button>
     </div>
   </section>
 
@@ -119,7 +136,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebas
 import { initializeAuth, inMemoryPersistence, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-const cfg = { apiKey: "AIzaSyDHUttmxneJt1KZCf3d-9lRqrdxLxx76C0", authDomain: "myweb-88daa.firebaseapp.com", projectId: "myweb-88daa", storageBucket: "myweb-88daa.firebasestorage.app", messagingSenderId: "1010467301315", appId: "1:1010467301315:web:0ef8d3cc72d28490570538" };
+const cfg = { apiKey: "AIzaSyDHUttmxneJt1KZCf3d-9lRqrdxLxx76C0", authDomain: "myweb-88daa.firebaseapp.com", projectId: "myweb-88daa", storageBucket: "myweb-88daa.firebasestorage.app", messagingSenderId: "297038746284", appId: "1:297038746284:web:272d0ecdc8a3cfa3a20509" };
 const app = initializeApp(cfg);
 const auth = initializeAuth(app, { persistence: inMemoryPersistence });
 const db = getFirestore(app), A = "my-whatsapp-clone", $ = id => document.getElementById(id), D = (g, id) => doc(db, "artifacts", A, "public", "data", g, id), C = g => collection(db, "artifacts", A, "public", "data", g);
@@ -129,18 +146,13 @@ const login = $("login"), chat = $("chat"), call = $("call"), incoming = $("inco
 
 function fail(t, e) { console.error(t, e); $("loginStatus").textContent = t + " — " + (e?.code || e?.message || "failed"); }
 function valid(x) { return /^[a-z0-9_-]{2,40}$/.test(x); }
-function msgLabel(m) { return m?.text || (m?.image ? "media" : "message"); }
-function openReplyComposer(m) {
-  if (!m) return;
+
+function triggerReply(m) {
   replyTo = m;
-  $("replyText").textContent = "Replying to: " + msgLabel(m);
+  $("replyTitle").textContent = m.senderId === myId ? "You" : partnerId;
+  $("replyText").textContent = m.text || (m.image ? "Photo" : "Media Attachment");
   $("replyBox").classList.remove("hidden");
-  $("actions").classList.add("hidden");
-}
-function openActionMenu(m) {
-  selected = m;
-  $("actions").classList.remove("hidden");
-  $("edit").classList.toggle("hidden", !(m.senderId === myId && !m.isDeleted && !m.image));
+  $("message").focus();
 }
 
 function render(s) {
@@ -154,12 +166,12 @@ function render(s) {
     r.className = "flex " + (m.senderId === myId ? "justify-end" : "justify-start");
     const b = document.createElement("div");
     b.className = "bubble " + (m.senderId === myId ? "sent" : "received");
-
+    
     if (m.replyTo) {
-      const q = document.createElement("div");
-      q.className = "quoted-box";
-      q.textContent = m.replyTo.text || "media";
-      b.appendChild(q);
+      const repDiv = document.createElement("div");
+      repDiv.className = "bg-black/5 border-l-2 border-teal-700 p-1.5 mb-1 text-xs rounded text-gray-700 truncate";
+      repDiv.textContent = m.replyTo.text;
+      b.appendChild(repDiv);
     }
 
     if (m.isDeleted) {
@@ -186,30 +198,34 @@ function render(s) {
 
     const f = document.createElement("small");
     f.className = "block text-right text-gray-500 mt-1";
-    f.innerHTML = new Date(m.timestamp || 0).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + (m.senderId === myId ? " " + (m.status === "read" ? "<span class='text-blue-600'>✓✓</span>" : "✓") : "");
+    f.innerHTML = new Date(m.timestamp || 0).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + (m.senderId === myId ? " " + (m.status === "read" ? "<span class='text-blue-600'>✓✓</span>" : m.status === "delivered" ? "✓✓" : "✓") : "");
     b.append(f);
+    
+    let sx = 0;
+    b.ontouchstart = e => sx = e.touches[0].clientX;
+    b.ontouchmove = e => {
+      let diff = e.touches[0].clientX - sx;
+      if (Math.abs(diff) < 60) {
+        b.style.transform = `translateX(${diff}px)`;
+      }
+    };
+    b.ontouchend = e => {
+      let diff = e.changedTouches[0].clientX - sx;
+      b.style.transform = "translateX(0px)";
+      if (Math.abs(diff) > 45) {
+        triggerReply(m);
+      }
+    };
 
-    let sx = 0, sy = 0, swipe = false;
-    b.onpointerdown = e => { sx = e.clientX; sy = e.clientY; swipe = false; };
-    b.onpointerup = e => {
-      const dx = e.clientX - sx;
-      const dy = e.clientY - sy;
-      if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy)) {
-        swipe = true;
-        openReplyComposer(m);
-        return;
-      }
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8 && !swipe) openActionMenu(m);
+    b.onclick = () => {
+      selected = m;
+      $("actions").classList.remove("hidden");
+      // Edit and Delete for Everyone options ONLY for user's own messages
+      const isMyMsg = (m.senderId === myId);
+      $("edit").classList.toggle("hidden", !(isMyMsg && !m.isDeleted && !m.image));
+      $("deleteAll").classList.toggle("hidden", !isMyMsg);
     };
-    b.onclick = e => {
-      if (swipe) {
-        swipe = false;
-        e.preventDefault();
-        e.stopPropagation();
-        return;
-      }
-      openActionMenu(m);
-    };
+
     r.append(b);
     $("messages").append(r);
     if (m.senderId !== myId && m.status !== "read") updateDoc(doc(C("chat_" + room), m.id), { status: "read" }).catch(() => {});
@@ -219,7 +235,7 @@ function render(s) {
 
 async function send(imgData = null) {
   const i = $("message"), text = i.value.trim();
-  if ((!text && !imgData) || !uid || !room) return;
+  if (!text && !imgData || !uid || !room) return;
   try {
     if (editing) {
       await updateDoc(doc(C("chat_" + room), editing.id), { text, isEdited: true });
@@ -227,7 +243,16 @@ async function send(imgData = null) {
     } else {
       const d = { text: text || "", senderId: myId, timestamp: Date.now(), status: "sent", deletedFor: [], isDeleted: false };
       if (imgData) d.image = imgData;
-      if (replyTo) { d.replyTo = { id: replyTo.id, text: msgLabel(replyTo) }; replyTo = null; $("replyBox").classList.add("hidden"); }
+      
+      if (replyTo) { 
+        d.replyTo = { 
+          id: replyTo.id, 
+          text: replyTo.text || (replyTo.image ? "Photo" : "Media Attachment") 
+        }; 
+        replyTo = null; 
+        $("replyBox").classList.add("hidden"); 
+      }
+
       await setDoc(doc(C("chat_" + room), "msg_" + Date.now() + Math.random().toString(36).slice(2, 7)), d);
     }
     i.value = "";
@@ -365,7 +390,6 @@ $("closeColors").onclick = () => $("colors").classList.add("hidden");
 document.querySelectorAll("[data-bg]").forEach(b => b.onclick = () => { chat.style.background = b.dataset.bg; localStorage.setItem("chat-bg", b.dataset.bg); $("colors").classList.add("hidden"); });
 if (localStorage.getItem("chat-bg")) chat.style.background = localStorage.getItem("chat-bg");
 
-// ROBUST PERMANENT CLEAR CHAT
 $("clearChat").onclick = async () => {
   if (confirm("Clear chat permanently for everyone?")) {
     try {
@@ -383,7 +407,12 @@ $("clearChat").onclick = async () => {
   }
 };
 
-$("mediaBtn").onclick = () => $("mediaInput").click();
+// Robust Media Picker Trigger
+$("mediaBtn").onclick = (e) => {
+  e.preventDefault();
+  $("mediaInput").click();
+};
+
 $("mediaInput").onchange = e => {
   const file = e.target.files[0];
   if (!file) return;
@@ -395,14 +424,10 @@ $("mediaInput").onchange = e => {
 $("closeMedia").onclick = () => $("mediaModal").classList.add("hidden");
 $("cancelReply").onclick = () => { $("replyBox").classList.add("hidden"); replyTo = null; };
 $("closeActions").onclick = () => $("actions").classList.add("hidden");
-$("reply").onclick = () => { if (!selected) return; openReplyComposer(selected); };
+$("reply").onclick = () => { triggerReply(selected); $("actions").classList.add("hidden"); };
 $("edit").onclick = () => { editing = selected; $("message").value = selected.text || ""; $("message").focus(); $("actions").classList.add("hidden"); };
-$("deleteMe").onclick = async () => { if (selected) await updateDoc(doc(C("chat_" + room), selected.id), { deletedFor: [...(selected.deletedFor || []), myId] }); $("actions").classList.add("hidden"); };
-$("deleteAll").onclick = async () => {
-  if (!selected) { $("actions").classList.add("hidden"); return; }
-  await updateDoc(doc(C("chat_" + room), selected.id), { isDeleted: true, text: "", image: "" });
-  $("actions").classList.add("hidden");
-};
+$("deleteMe").onclick = async () => { if (selected) await updateDoc(doc(C("chat_" + room), selected.id), { deletedFor: [...(selected.deletedFor \vert{}\vert{} []), myId] }); $("actions").classList.add("hidden"); };
+$("deleteAll").onclick = async () => { if (selected && selected.senderId === myId) await updateDoc(doc(C("chat_" + room), selected.id), { isDeleted: true, text: "", image: "" }); $("actions").classList.add("hidden"); };
 
 const timer = setTimeout(() => { if (!uid) { $("loginStatus").textContent = "Firebase timeout — check Anonymous Auth"; } }, 12000);
 

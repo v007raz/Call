@@ -37,7 +37,7 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
         <button id="videoCall" class="p-2 text-xl">▣</button>
         <button id="menuBtn" class="p-2 text-xl">⋮</button>
         <div id="menu" class="hidden absolute right-0 top-12 bg-white text-gray-800 w-48 z-20 shadow rounded">
-          <button id="clearChat" class="block w-full text-left p-3 border-b">Clear chat</button>
+          <button id="clearChat" class="block w-full text-left p-3 border-b text-red-600 font-bold">Clear chat</button>
           <button id="bgBtn" class="block w-full text-left p-3">Background color</button>
         </div>
       </div>
@@ -301,10 +301,7 @@ let speakerOn = false;
 $("speaker").onclick = () => {
   speakerOn = !speakerOn;
   const remoteVideo = $("remote");
-  if (typeof remoteVideo.sinkId !== 'undefined') {
-    // Advanced audio output switching if supported
-  }
-  remoteVideo.muted = !speakerOn; // basic toggle simulation for mobile audio output
+  remoteVideo.muted = !speakerOn;
   $("speaker").textContent = speakerOn ? "🔊 Speaker On" : "🔈 Earpiece";
 };
 
@@ -315,18 +312,21 @@ $("closeColors").onclick = () => $("colors").classList.add("hidden");
 document.querySelectorAll("[data-bg]").forEach(b => b.onclick = () => { chat.style.background = b.dataset.bg; localStorage.setItem("chat-bg", b.dataset.bg); $("colors").classList.add("hidden"); });
 if (localStorage.getItem("chat-bg")) chat.style.background = localStorage.getItem("chat-bg");
 
+// FULL AND FINAL PERMANENT CLEAR CHAT
 $("clearChat").onclick = async () => {
-  if (confirm("Clear chat?")) {
-    const snap = await new Promise(resolve => {
-      const unsub = onSnapshot(query(C("chat_" + room)), snapshot => {
-        unsub();
-        resolve(snapshot);
+  if (confirm("Clear chat permanently for everyone?")) {
+    try {
+      const snap = await new Promise(resolve => {
+        const unsub = onSnapshot(query(C("chat_" + room)), snapshot => {
+          unsub();
+          resolve(snapshot);
+        });
       });
-    });
-    await Promise.all(snap.docs.map(docSnap => 
-      updateDoc(docSnap.ref, { deletedFor: [...(docSnap.data().deletedFor || []), myId] }).catch(() => {})
-    ));
-    $("menu").classList.add("hidden");
+      await Promise.all(snap.docs.map(docSnap => deleteDoc(docSnap.ref)));
+      $("menu").classList.add("hidden");
+    } catch (e) {
+      fail("Clear chat failed", e);
+    }
   }
 };
 

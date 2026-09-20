@@ -10,21 +10,10 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
 #app{max-width:450px;height:100%;margin:auto;position:relative;overflow:hidden;background:#fff}
 .screen{position:absolute;inset:0}
 .hidden{display:none!important}
-.bubble{max-width:80%;padding:8px 10px;border-radius:10px;word-break:break-word;position:relative;transition:transform 0.2s ease;}
+.bubble{max-width:80%;padding:8px 10px;border-radius:10px;word-break:break-word;position:relative}
 .sent{background:#dcf8c6}
 .received{background:#fff}
 .modal{background:#0008;z-index:50}
-/* Smooth Reply Box Animation */
-#replyBox {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  transform: translateY(0);
-}
-#replyBox.hidden {
-  transform: translateY(100%);
-  opacity: 0;
-  display: flex !important;
-  pointer-events: none;
-}
 </style>
 </head>
 <body>
@@ -33,8 +22,8 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
     <h1 class="text-2xl font-bold text-center mb-6">Secure Cloud</h1>
     <input id="myId" class="border rounded p-3 mb-3" placeholder="Your ID (e.g. doraemon)">
     <input id="partnerId" class="border rounded p-3 mb-3" placeholder="Partner ID (e.g. nobita)">
-    <button id="connect" class="bg-teal-700 text-white rounded p-3 font-bold">Connecting to Firebase…</button>
-    <p id="loginStatus" class="text-center text-sm mt-4 text-gray-500">Initializing Firebase…</p>
+    <button id="connect" class="bg-teal-700 text-white rounded p-3 font-bold">Loading Firebase…</button>
+    <p id="loginStatus" class="text-center text-sm mt-4 text-gray-500">Connecting to Firebase…</p>
   </section>
 
   <section id="chat" class="screen hidden flex flex-col" style="background:#efeae2">
@@ -55,18 +44,13 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
     </header>
     <main id="messages" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2"></main>
     
-    <!-- Smooth Reply Box -->
-    <div id="replyBox" class="hidden bg-white p-2.5 text-sm border-l-4 border-teal-700 shadow-inner flex justify-between items-center">
-      <div>
-        <b id="replyTitle" class="text-teal-700 block text-xs">Replying</b>
-        <span id="replyText" class="text-gray-600 truncate block max-w-[320px]"></span>
-      </div>
-      <button id="cancelReply" class="text-gray-500 font-bold px-2 py-1">✕</button>
+    <div id="replyBox" class="hidden bg-white p-2 text-sm flex justify-between items-center border-l-4 border-teal-700">
+      <span id="replyText"></span><button id="cancelReply" class="font-bold px-2">✕</button>
     </div>
 
     <div class="p-2 bg-gray-100 flex items-center gap-2">
       <input type="file" id="mediaInput" accept="image/*" class="hidden">
-      <button id="mediaBtn" type="button" class="rounded-full bg-gray-200 text-gray-700 w-10 h-10 flex items-center justify-center text-lg font-bold shrink-0">＋</button>
+      <button id="mediaBtn" class="rounded-full bg-gray-200 text-gray-700 w-10 h-10 flex items-center justify-center text-lg font-bold shrink-0">＋</button>
       <textarea id="message" rows="1" class="flex-1 rounded-2xl p-3 border" placeholder="Message"></textarea>
       <button id="send" class="rounded-full bg-teal-700 text-white w-12 h-12 flex items-center justify-center shrink-0">➤</button>
     </div>
@@ -106,7 +90,6 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
     </div>
   </div>
 
-  <!-- Media Full Screen Preview Modal -->
   <div id="mediaModal" class="screen hidden modal flex flex-col items-center justify-center bg-black/95 p-4 z-50">
     <img id="previewImg" class="max-w-full max-h-[75vh] object-contain rounded mb-6" />
     <div class="flex gap-4">
@@ -147,14 +130,6 @@ const login = $("login"), chat = $("chat"), call = $("call"), incoming = $("inco
 function fail(t, e) { console.error(t, e); $("loginStatus").textContent = t + " — " + (e?.code || e?.message || "failed"); }
 function valid(x) { return /^[a-z0-9_-]{2,40}$/.test(x); }
 
-function triggerReply(m) {
-  replyTo = m;
-  $("replyTitle").textContent = m.senderId === myId ? "You" : partnerId;
-  $("replyText").textContent = m.text || (m.image ? "Photo" : "Media Attachment");
-  $("replyBox").classList.remove("hidden");
-  $("message").focus();
-}
-
 function render(s) {
   const a = [];
   s.forEach(x => a.push({ id: x.id, ...x.data() }));
@@ -169,7 +144,7 @@ function render(s) {
     
     if (m.replyTo) {
       const repDiv = document.createElement("div");
-      repDiv.className = "bg-black/5 border-l-2 border-teal-700 p-1.5 mb-1 text-xs rounded text-gray-700 truncate";
+      repDiv.className = "bg-black/5 border-l-2 border-teal-700 p-1 mb-1 text-xs rounded text-gray-700 truncate";
       repDiv.textContent = m.replyTo.text;
       b.appendChild(repDiv);
     }
@@ -200,35 +175,27 @@ function render(s) {
     f.className = "block text-right text-gray-500 mt-1";
     f.innerHTML = new Date(m.timestamp || 0).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + (m.senderId === myId ? " " + (m.status === "read" ? "<span class='text-blue-600'>✓✓</span>" : m.status === "delivered" ? "✓✓" : "✓") : "");
     b.append(f);
-    
+
     let sx = 0;
     b.ontouchstart = e => sx = e.touches[0].clientX;
-    b.ontouchmove = e => {
-      let diff = e.touches[0].clientX - sx;
-      if (Math.abs(diff) < 60) {
-        b.style.transform = `translateX(${diff}px)`;
-      }
-    };
-    b.ontouchend = e => {
-      let diff = e.changedTouches[0].clientX - sx;
-      b.style.transform = "translateX(0px)";
-      if (Math.abs(diff) > 45) {
-        triggerReply(m);
-      }
+    b.ontouchend = e => { 
+      if (e.changedTouches[0].clientX - sx > 45) { 
+        replyTo = m; 
+        $("replyText").textContent = "Replying to: " + (m.text || "media"); 
+        $("replyBox").classList.remove("hidden"); 
+      } 
     };
 
-    b.onclick = () => {
-      selected = m;
-      $("actions").classList.remove("hidden");
-      // Edit and Delete for Everyone options ONLY for user's own messages
+    b.onclick = () => { 
+      selected = m; 
+      $("actions").classList.remove("hidden"); 
       const isMyMsg = (m.senderId === myId);
-      $("edit").classList.toggle("hidden", !(isMyMsg && !m.isDeleted && !m.image));
+      $("edit").classList.toggle("hidden", !(isMyMsg && !m.isDeleted && !m.image)); 
       $("deleteAll").classList.toggle("hidden", !isMyMsg);
     };
-
     r.append(b);
     $("messages").append(r);
-    if (m.senderId !== myId && m.status !== "read") updateDoc(doc(C("chat_" + room), m.id), { status: "read" }).catch(() => {});
+    if (m.senderId !== myId && m.status !== "read") updateDoc(doc(C("chat_"+room), m.id), { status: "read" }).catch(() => {});
   });
   $("messages").scrollTop = $("messages").scrollHeight;
 }
@@ -238,22 +205,17 @@ async function send(imgData = null) {
   if (!text && !imgData || !uid || !room) return;
   try {
     if (editing) {
-      await updateDoc(doc(C("chat_" + room), editing.id), { text, isEdited: true });
+      await updateDoc(doc(C("chat_"+room), editing.id), { text, isEdited: true });
       editing = null;
     } else {
       const d = { text: text || "", senderId: myId, timestamp: Date.now(), status: "sent", deletedFor: [], isDeleted: false };
       if (imgData) d.image = imgData;
-      
       if (replyTo) { 
-        d.replyTo = { 
-          id: replyTo.id, 
-          text: replyTo.text || (replyTo.image ? "Photo" : "Media Attachment") 
-        }; 
+        d.replyTo = { id: replyTo.id, text: replyTo.text || "media" }; 
         replyTo = null; 
         $("replyBox").classList.add("hidden"); 
       }
-
-      await setDoc(doc(C("chat_" + room), "msg_" + Date.now() + Math.random().toString(36).slice(2, 7)), d);
+      await setDoc(doc(C("chat_"+room), "msg_"+Date.now()+Math.random().toString(36).slice(2,7)), d);
     }
     i.value = "";
   } catch (e) { fail("Message send failed", e); }
@@ -278,7 +240,7 @@ function setup() {
   $("partnerName").textContent = partnerId;
   login.classList.add("hidden");
   chat.classList.remove("hidden");
-  unChat = onSnapshot(query(C("chat_" + room)), render, e => fail("Chat sync failed", e));
+  unChat = onSnapshot(query(C("chat_"+room)), render, e => fail("Chat sync failed", e));
   presence();
   listenIncoming();
 }
@@ -301,13 +263,13 @@ function peer(caller) {
   pc = new RTCPeerConnection(rtc);
   stream.getTracks().forEach(t => pc.addTrack(t, stream));
   pc.ontrack = e => { $("remote").srcObject = e.streams[0]; $("callState").textContent = "Connected"; };
-  pc.onicecandidate = e => e.candidate && setDoc(doc(collection(db, "artifacts", A, "public", "data", "call_candidates", callId, caller ? myId : partnerId)), e.candidate.toJSON()).catch(console.warn);
+  pc.onicecandidate = e => e.candidate && setDoc(doc(collection(db,"artifacts",A,"public","data","call_candidates",callId,caller?myId:partnerId)), e.candidate.toJSON()).catch(console.warn);
   return pc;
 }
 
 function watch(owner) {
-  return onSnapshot(collection(db, "artifacts", A, "public", "data", "call_candidates", callId, owner), s => s.docChanges().forEach(async x => {
-    if (x.type !== "added" || !pc) return;
+  return onSnapshot(collection(db,"artifacts",A,"public","data","call_candidates",callId,owner), s => s.docChanges().forEach(async x => {
+    if (x.type!=="added"||!pc) return;
     const c = new RTCIceCandidate(x.doc.data());
     if (pc.remoteDescription) await pc.addIceCandidate(c);
     else queued.push(c);
@@ -321,19 +283,19 @@ async function mediaStream(video) {
 async function start(video) {
   stream = await mediaStream(video);
   if (!stream) return;
-  callId = room + "_" + Date.now();
+  callId = room+"_"+Date.now();
   $("local").srcObject = stream;
-  $("local").classList.toggle("hidden", !video);
-  $("remote").classList.toggle("hidden", !video);
-  $("audioOnly").classList.toggle("hidden", video);
+  $("local").classList.toggle("hidden",!video);
+  $("remote").classList.toggle("hidden",!video);
+  $("audioOnly").classList.toggle("hidden",video);
   $("callName").textContent = partnerId;
   chat.classList.add("hidden");
   call.classList.remove("hidden");
   peer(true);
   const o = await pc.createOffer();
   await pc.setLocalDescription(o);
-  await setDoc(D("active_calls", partnerId), { caller: myId, type: video ? "video" : "audio", offer: { type: o.type, sdp: o.sdp }, callId, timestamp: Date.now() });
-  onSnapshot(D("call_answers", callId), async s => {
+  await setDoc(D("active_calls",partnerId), { caller:myId, type:video?"video":"audio", offer:{type:o.type,sdp:o.sdp}, callId, timestamp:Date.now() });
+  onSnapshot(D("call_answers",callId), async s => {
     const d = s.data();
     if (d?.answer && !pc.currentRemoteDescription) {
       await pc.setRemoteDescription(d.answer);
@@ -346,7 +308,7 @@ async function start(video) {
 
 async function acceptCall() {
   const d = pending;
-  stream = await mediaStream(d.type === "video");
+  stream = await mediaStream(d.type==="video");
   if (!stream) return;
   callId = d.callId;
   partnerId = d.caller;
@@ -358,86 +320,72 @@ async function acceptCall() {
   await pc.setRemoteDescription(d.offer);
   const a = await pc.createAnswer();
   await pc.setLocalDescription(a);
-  await setDoc(D("call_answers", callId), { answer: { type: a.type, sdp: a.sdp } });
+  await setDoc(D("call_answers",callId), { answer:{type:a.type,sdp:a.sdp} });
   watch(d.caller);
-  await deleteDoc(D("active_calls", myId));
+  await deleteDoc(D("active_calls",myId));
   pending = null;
 }
 
-$("myId").value = localStorage.getItem("whatsapp_my_id") || "";
+$("myId").value = localStorage.getItem("whatsapp_my_id")||"";
 $("connect").onclick = setup;
 $("send").onclick = () => send();
-$("message").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
+$("message").onkeydown = e => { if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}};
 $("audioCall").onclick = () => start(false);
 $("videoCall").onclick = () => start(true);
 $("accept").onclick = () => acceptCall().catch(e => fail("Accept call failed", e));
-$("reject").onclick = () => { incoming.classList.add("hidden"); if (pending) deleteDoc(D("active_calls", myId)); pending = null; };
+$("reject").onclick = () => { incoming.classList.add("hidden"); if(pending) deleteDoc(D("active_calls",myId)); pending = null; };
 $("end").onclick = reset;
-$("mute").onclick = () => { const t = stream?.getAudioTracks()[0]; if (t) { t.enabled = !t.enabled; $("mute").textContent = t.enabled ? "🎙 Mute" : "🔇 Unmute"; } };
+$("mute").onclick = () => { const t = stream?.getAudioTracks()[0]; if(t){ t.enabled=!t.enabled; $("mute").textContent=t.enabled?"🎙 Mute":"🔇 Unmute"; } };
 
 let speakerOn = false;
 $("speaker").onclick = () => {
   speakerOn = !speakerOn;
-  const remoteVideo = $("remote");
-  remoteVideo.muted = !speakerOn;
+  $("remote").muted = !speakerOn;
   $("speaker").textContent = speakerOn ? "🔊 Speaker On" : "🔈 Earpiece";
 };
 
-$("toggleVideo").onclick = () => { const t = stream?.getVideoTracks()[0]; if (t) t.enabled = !t.enabled; };
+$("toggleVideo").onclick = () => { const t = stream?.getVideoTracks()[0]; if(t) t.enabled=!t.enabled; };
 $("menuBtn").onclick = () => $("menu").classList.toggle("hidden");
 $("bgBtn").onclick = () => { $("colors").classList.remove("hidden"); $("menu").classList.add("hidden"); };
 $("closeColors").onclick = () => $("colors").classList.add("hidden");
-document.querySelectorAll("[data-bg]").forEach(b => b.onclick = () => { chat.style.background = b.dataset.bg; localStorage.setItem("chat-bg", b.dataset.bg); $("colors").classList.add("hidden"); });
-if (localStorage.getItem("chat-bg")) chat.style.background = localStorage.getItem("chat-bg");
+document.querySelectorAll("[data-bg]").forEach(b => b.onclick = () => { chat.style.background=b.dataset.bg; localStorage.setItem("chat-bg",b.dataset.bg); $("colors").classList.add("hidden"); });
+if(localStorage.getItem("chat-bg")) chat.style.background=localStorage.getItem("chat-bg");
 
 $("clearChat").onclick = async () => {
-  if (confirm("Clear chat permanently for everyone?")) {
+  if(confirm("Clear chat permanently for everyone?")){
     try {
-      const snap = await new Promise(resolve => {
-        const unsub = onSnapshot(query(C("chat_" + room)), snapshot => {
-          unsub();
-          resolve(snapshot);
-        });
-      });
-      await Promise.all(snap.docs.map(docSnap => deleteDoc(docSnap.ref).catch(err => console.error("Delete error", err))));
+      const snap = await new Promise(r => { const u = onSnapshot(query(C("chat_"+room)), x => { u(); r(x); }); });
+      await Promise.all(snap.docs.map(x => deleteDoc(x.ref).catch(()=>{0})));
       $("menu").classList.add("hidden");
-    } catch (e) {
-      fail("Clear chat failed", e);
-    }
+    } catch(e){ fail("Clear chat failed", e); }
   }
 };
 
-// Robust Media Picker Trigger
-$("mediaBtn").onclick = (e) => {
-  e.preventDefault();
-  $("mediaInput").click();
-};
-
+$("mediaBtn").onclick = () => $("mediaInput").click();
 $("mediaInput").onchange = e => {
   const file = e.target.files[0];
-  if (!file) return;
+  if(!file) return;
   const reader = new FileReader();
-  reader.onload = event => send(event.target.result);
+  reader.onload = ev => send(ev.target.result);
   reader.readAsDataURL(file);
 };
 
 $("closeMedia").onclick = () => $("mediaModal").classList.add("hidden");
 $("cancelReply").onclick = () => { $("replyBox").classList.add("hidden"); replyTo = null; };
 $("closeActions").onclick = () => $("actions").classList.add("hidden");
-$("reply").onclick = () => { triggerReply(selected); $("actions").classList.add("hidden"); };
-$("edit").onclick = () => { editing = selected; $("message").value = selected.text || ""; $("message").focus(); $("actions").classList.add("hidden"); };
-$("deleteMe").onclick = async () => { if (selected) await updateDoc(doc(C("chat_" + room), selected.id), { deletedFor: [...(selected.deletedFor \vert{}\vert{} []), myId] }); $("actions").classList.add("hidden"); };
-$("deleteAll").onclick = async () => { if (selected && selected.senderId === myId) await updateDoc(doc(C("chat_" + room), selected.id), { isDeleted: true, text: "", image: "" }); $("actions").classList.add("hidden"); };
+$("reply").onclick = () => { replyTo = selected; $("replyText").textContent = "Replying to: "+(selected.text||"media"); $("replyBox").classList.remove("hidden"); $("actions").classList.add("hidden"); };
+$("edit").onclick = () => { editing = selected; $("message").value = selected.text||""; $("message").focus(); $("actions").classList.add("hidden"); };
+$("deleteMe").onclick = async () => { if(selected) await updateDoc(doc(C("chat_"+room),selected.id),{deletedFor:[...(selected.deletedFor||[]),myId]}); $("actions").classList.add("hidden"); };
+$("deleteAll").onclick = async () => { if(selected && selected.senderId === myId) await updateDoc(doc(C("chat_"+room),selected.id),{isDeleted:true,text:"",image:""}); $("actions").classList.add("hidden"); };
 
-const timer = setTimeout(() => { if (!uid) { $("loginStatus").textContent = "Firebase timeout — check Anonymous Auth"; } }, 12000);
-
-signInAnonymously(auth).catch(e => fail("Firebase auth failed", e));
-onAuthStateChanged(auth, u => {
-  uid = u?.uid || null;
-  if (uid) {
+const timer = setTimeout(()=>{if(!uid){$("loginStatus").textContent="Firebase auth timeout — check console"}},12000);
+signInAnonymously(auth).catch(e=>fail("Firebase authentication failed",e));
+onAuthStateChanged(auth,u=>{
+  uid=u?.uid||null;
+  if(uid){
     clearTimeout(timer);
-    $("connect").textContent = "Start Secure Chat";
-    $("loginStatus").textContent = "✅ Connected";
+    $("connect").textContent="Start Secure Chat";
+    $("loginStatus").textContent="✅ Connected";
   }
 });
 </script>

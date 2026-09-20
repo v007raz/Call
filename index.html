@@ -10,10 +10,20 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
 #app{max-width:450px;height:100%;margin:auto;position:relative;overflow:hidden;background:#fff}
 .screen{position:absolute;inset:0}
 .hidden{display:none!important}
-.bubble{max-width:80%;padding:8px 10px;border-radius:10px;word-break:break-word;position:relative}
+.bubble{max-width:80%;padding:8px 10px;border-radius:10px;word-break:break-word;position:relative;transition:transform 0.15s ease-out;}
 .sent{background:#dcf8c6}
 .received{background:#fff}
 .modal{background:#0008;z-index:50}
+#replyBox {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateY(0);
+}
+#replyBox.hidden {
+  transform: translateY(100%);
+  opacity: 0;
+  display: flex !important;
+  pointer-events: none;
+}
 </style>
 </head>
 <body>
@@ -44,8 +54,13 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
     </header>
     <main id="messages" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2"></main>
     
-    <div id="replyBox" class="hidden bg-white p-2 text-sm flex justify-between items-center border-l-4 border-teal-700">
-      <span id="replyText"></span><button id="cancelReply" class="font-bold px-2">✕</button>
+    <!-- Smooth Reply Box -->
+    <div id="replyBox" class="hidden bg-white p-2.5 text-sm border-l-4 border-teal-700 shadow-inner flex justify-between items-center">
+      <div>
+        <b id="replyTitle" class="text-teal-700 block text-xs">Replying</b>
+        <span id="replyText" class="text-gray-600 truncate block max-w-[320px]"></span>
+      </div>
+      <button id="cancelReply" class="text-gray-500 font-bold px-2 py-1">✕</button>
     </div>
 
     <div class="p-2 bg-gray-100 flex items-center gap-2">
@@ -124,11 +139,19 @@ const app = initializeApp(cfg);
 const auth = initializeAuth(app, { persistence: inMemoryPersistence });
 const db = getFirestore(app), A = "my-whatsapp-clone", $ = id => document.getElementById(id), D = (g, id) => doc(db, "artifacts", A, "public", "data", g, id), C = g => collection(db, "artifacts", A, "public", "data", g);
 
-let uid = null, myId = "", partnerId = "", room = "", unChat, unPresence, unIncoming, presenceTimer, pc, stream, callId, pending, selected, replyTo, editing, queued = [];
+let uid = null, myId = "", partnerId = "", room = "", unChat, unPresence, unIncoming, presenceTimer, pc, stream, callId, pending, selected, replyTo = null, editing = null, queued = [];
 const login = $("login"), chat = $("chat"), call = $("call"), incoming = $("incoming");
 
 function fail(t, e) { console.error(t, e); $("loginStatus").textContent = t + " — " + (e?.code || e?.message || "failed"); }
 function valid(x) { return /^[a-z0-9_-]{2,40}$/.test(x); }
+
+function triggerReply(m) {
+  replyTo = m;
+  $("replyTitle").textContent = m.senderId === myId ? "You" : partnerId;
+  $("replyText").textContent = m.text || (m.image ? "Photo Attachment" : "Media");
+  $("replyBox").classList.remove("hidden");
+  $("message").focus();
+}
 
 function render(s) {
   const a = [];
@@ -142,9 +165,10 @@ function render(s) {
     const b = document.createElement("div");
     b.className = "bubble " + (m.senderId === myId ? "sent" : "received");
     
-    if (m.replyTo) {
+    // Display reply context clearly inside the bubble
+    if (m.replyTo && m.replyTo.text) {
       const repDiv = document.createElement("div");
-      repDiv.className = "bg-black/5 border-l-2 border-teal-700 p-1 mb-1 text-xs rounded text-gray-700 truncate";
+      repDiv.className = "bg-black/5 border-l-2 border-teal-700 p-1.5 mb-1 text-xs rounded text-gray-700 truncate";
       repDiv.textContent = m.replyTo.text;
       b.appendChild(repDiv);
     }
@@ -176,14 +200,21 @@ function render(s) {
     f.innerHTML = new Date(m.timestamp || 0).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + (m.senderId === myId ? " " + (m.status === "read" ? "<span class='text-blue-600'>✓✓</span>" : m.status === "delivered" ? "✓✓" : "✓") : "");
     b.append(f);
 
+    // Smooth Left & Right Swipe to Reply
     let sx = 0;
     b.ontouchstart = e => sx = e.touches[0].clientX;
-    b.ontouchend = e => { 
-      if (e.changedTouches[0].clientX - sx > 45) { 
-        replyTo = m; 
-        $("replyText").textContent = "Replying to: " + (m.text || "media"); 
-        $("replyBox").classList.remove("hidden"); 
-      } 
+    b.ontouchmove = e => {
+      let diff = e.touches[0].clientX - sx;
+      if (Math.abs(diff) < 70) {
+        b.style.transform = `translateX(${diff}px)`;
+      }
+    };
+    b.ontouchend = e => {
+      let diff = e.changedTouches[0].clientX - sx;
+      b.style.transform = "translateX(0px)";
+      if (Math.abs(diff) > 35) {
+        triggerReply(m);
+      }
     };
 
     b.onclick = () => { 
@@ -210,11 +241,17 @@ async function send(imgData = null) {
     } else {
       const d = { text: text || "", senderId: myId, timestamp: Date.now(), status: "sent", deletedFor: [], isDeleted: false };
       if (imgData) d.image = imgData;
+      
+      // Save Reply reference reliably
       if (replyTo) { 
-        d.replyTo = { id: replyTo.id, text: replyTo.text || "media" }; 
+        d.replyTo = { 
+          id: replyTo.id, 
+          text: replyTo.text || (replyTo.image ? "Photo Attachment" : "Media") 
+        }; 
         replyTo = null; 
         $("replyBox").classList.add("hidden"); 
       }
+
       await setDoc(doc(C("chat_"+room), "msg_"+Date.now()+Math.random().toString(36).slice(2,7)), d);
     }
     i.value = "";
@@ -373,9 +410,9 @@ $("mediaInput").onchange = e => {
 $("closeMedia").onclick = () => $("mediaModal").classList.add("hidden");
 $("cancelReply").onclick = () => { $("replyBox").classList.add("hidden"); replyTo = null; };
 $("closeActions").onclick = () => $("actions").classList.add("hidden");
-$("reply").onclick = () => { replyTo = selected; $("replyText").textContent = "Replying to: "+(selected.text||"media"); $("replyBox").classList.remove("hidden"); $("actions").classList.add("hidden"); };
+$("reply").onclick = () => { triggerReply(selected); $("actions").classList.add("hidden"); };
 $("edit").onclick = () => { editing = selected; $("message").value = selected.text||""; $("message").focus(); $("actions").classList.add("hidden"); };
-$("deleteMe").onclick = async () => { if(selected) await updateDoc(doc(C("chat_"+room),selected.id),{deletedFor:[...(selected.deletedFor||[]),myId]}); $("actions").classList.add("hidden"); };
+$("deleteMe").onclick = async () => { if(selected) await updateDoc(doc(C("chat_"+room),selected.id),{deletedFor:[...(selected.deletedFor\vert{}\vert{}[]),myId]}); $("actions").classList.add("hidden"); };
 $("deleteAll").onclick = async () => { if(selected && selected.senderId === myId) await updateDoc(doc(C("chat_"+room),selected.id),{isDeleted:true,text:"",image:""}); $("actions").classList.add("hidden"); };
 
 const timer = setTimeout(()=>{if(!uid){$("loginStatus").textContent="Firebase auth timeout — check console"}},12000);

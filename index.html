@@ -199,7 +199,6 @@ function render(s) {
     f.innerHTML = new Date(m.timestamp || 0).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + (m.senderId === myId ? " " + (m.status === "read" ? "<span class='text-blue-600'>✓✓</span>" : m.status === "delivered" ? "✓✓" : "✓") : "");
     b.append(f);
 
-    // Smooth Left & Right Swipe to Reply
     let sx = 0;
     b.ontouchstart = e => sx = e.touches[0].clientX;
     b.ontouchmove = e => {
@@ -253,7 +252,7 @@ async function send(imgData = null) {
       await setDoc(doc(C("chat_"+room), "msg_"+Date.now()+Math.random().toString(36).slice(2,7)), d);
     }
     i.value = "";
-    i.focus(); // Keeps keyboard open after sending message
+    i.focus();
   } catch (e) { fail("Message send failed", e); }
 }
 

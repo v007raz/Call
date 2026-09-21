@@ -518,18 +518,51 @@ function render(s) {
       }
     };
 
-    b.onclick = () => {
-      if (b.dataset.swipeReply === "1") return;
+    // Normal tap does nothing. Message actions open only on long-press.
+    let longPressTimer = null;
+    let longPressTriggered = false;
+    let pressStartX = 0, pressStartY = 0;
+
+    const openMessageActions = () => {
       selected = m;
       $("actions").classList.remove("hidden");
-      $("deleteAll").classList.toggle(
-        "hidden",
-        m.senderId !== myId || m.isDeleted
-      );
-      $("edit").classList.toggle(
-        "hidden",
-        !(m.senderId === myId && !m.isDeleted && !m.image)
-      );
+      $("deleteAll").classList.toggle("hidden", m.senderId !== myId || m.isDeleted);
+      $("edit").classList.toggle("hidden", !(m.senderId === myId && !m.isDeleted && !m.image));
+    };
+
+    const cancelLongPress = () => {
+      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    };
+
+    b.addEventListener("pointerdown", e => {
+      if (e.target.closest("a, img")) return;
+      longPressTriggered = false;
+      pressStartX = e.clientX; pressStartY = e.clientY;
+      cancelLongPress();
+      longPressTimer = setTimeout(() => {
+        longPressTimer = null;
+        longPressTriggered = true;
+        if (navigator.vibrate) navigator.vibrate(30);
+        openMessageActions();
+      }, 550);
+    });
+
+    b.addEventListener("pointermove", e => {
+      if (Math.hypot(e.clientX - pressStartX, e.clientY - pressStartY) > 12) cancelLongPress();
+    });
+    b.addEventListener("pointerup", e => {
+      cancelLongPress();
+      if (longPressTriggered) { e.preventDefault(); e.stopPropagation(); }
+    });
+    b.addEventListener("pointercancel", cancelLongPress);
+    b.addEventListener("contextmenu", e => { e.preventDefault(); e.stopPropagation(); });
+
+    b.onclick = e => {
+      if (e.target.closest("a, img")) return;
+      if (b.dataset.swipeReply === "1" || longPressTriggered) {
+        longPressTriggered = false;
+        return;
+      }
     };
 
     r.append(b);

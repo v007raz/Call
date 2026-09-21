@@ -3,17 +3,84 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(self)">
 <title>Secure Cloud</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.tailwindcss.com">
+
+function linkifyText(text) {
+  const frag = document.createDocumentFragment();
+  const re = /(https?:\/\/[^\s<]+|www\.[^\s<]+)/gi;
+  let last = 0, m;
+  while ((m = re.exec(text)) !== null) {
+    frag.append(document.createTextNode(text.slice(last, m.index)));
+    let raw = m[0], trailing = "";
+    while (/[.,!?;:)\]}]$/.test(raw)) {
+      trailing = raw.slice(-1) + trailing;
+      raw = raw.slice(0, -1);
+    }
+    const a = document.createElement("a");
+    a.className = "linkified";
+    a.textContent = raw;
+    a.href = raw.startsWith("www.") ? "https://" + raw : raw;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.onclick = e => {
+      e.preventDefault();
+      const url = a.href;
+      if (/Android/i.test(navigator.userAgent)) {
+        try {
+          const u = new URL(url);
+          window.location.href =
+            "intent://" + u.host + u.pathname + u.search + u.hash +
+            "#Intent;scheme=" + u.protocol.replace(":", "") +
+            ";package=com.android.chrome;end";
+          return;
+        } catch (_) {}
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+    };
+    frag.append(a);
+    if (trailing) frag.append(document.createTextNode(trailing));
+    last = m.index + m[0].length;
+  }
+  frag.append(document.createTextNode(text.slice(last)));
+  return frag;
+}
+
+</script>
 <style>
 html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
-#app{max-width:450px;height:100%;margin:auto;position:relative;overflow:hidden;background:#fff}
+#app{max-width:450px;height:var(--app-height,100dvh);margin:auto;position:relative;overflow:hidden;background:#fff}
+#chat{height:100%;min-height:0}
+#messages{min-height:0}
+#composer{flex-shrink:0;position:relative;z-index:5}
 .screen{position:absolute;inset:0}
 .hidden{display:none!important}
-.bubble{max-width:80%;padding:8px 10px;border-radius:10px;word-break:break-word}
+.bubble{max-width:80%;min-width:92px;padding:8px 10px;border-radius:10px;word-break:break-word}
 .sent{background:#dcf8c6}
 .received{background:#fff}
 .modal{background:#0008;z-index:50}
+
+/* Compact reply bubble shown directly above the message composer. */
+#replyBox{
+  margin:0 10px 4px;
+  padding:7px 9px;
+  border:1px solid #d1d5db;
+  border-left:4px solid #0f766e;
+  border-radius:10px;
+  background:#ffffff;
+  box-shadow:0 1px 3px rgba(0,0,0,.10);
+  min-height:34px;
+}
+#replyBox > div{min-width:0;flex:1}
+#replyText{max-width:calc(100vw - 105px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#cancelReply{font-size:16px;line-height:1;min-width:30px;height:30px;border-radius:50%}
+#cancelReply:active{background:#f3f4f6}
+
+/* Keep the composer/input ready while reply mode is active. */
+#message.reply-lock{caret-color:#0f766e}
+
+.linkified { color:#2563eb; text-decoration:underline; cursor:pointer; word-break:break-all; }
 </style>
 </head>
 <body>
@@ -27,10 +94,16 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
   </section>
 
   <section id="chat" class="screen hidden flex flex-col" style="background:#efeae2">
-    <header class="bg-teal-700 text-white p-3 flex justify-between items-center">
-      <div>
-        <b id="partnerName">Partner</b>
-        <small id="status" class="block">Offline</small>
+    <header id="chatHeader" class="bg-teal-700 text-white p-3 flex justify-between items-center">
+      <div class="flex items-center gap-3 min-w-0">
+        <button id="dpBtn" type="button" class="w-11 h-11 rounded-full bg-white/20 overflow-hidden flex items-center justify-center shrink-0" title="Set profile photo">
+          <img id="partnerDp" class="w-full h-full object-cover hidden" alt="Profile photo">
+          <span id="dpPlaceholder" class="text-xl">👤</span>
+        </button>
+        <div class="min-w-0">
+          <b id="partnerName" class="block truncate">Partner</b>
+          <small id="status" class="block">Offline</small>
+        </div>
       </div>
       <div class="flex items-center gap-3 relative">
         <button id="audioCall" class="p-2 text-xl">☎</button>
@@ -38,20 +111,22 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
         <button id="menuBtn" class="p-2 text-xl">⋮</button>
         <div id="menu" class="hidden absolute right-0 top-12 bg-white text-gray-800 w-48 z-20 shadow rounded">
           <button id="clearChat" class="block w-full text-left p-3 border-b text-red-600 font-bold">Clear chat</button>
+          <button id="themeBtn" class="block w-full text-left p-3">Chat theme</button>
           <button id="bgBtn" class="block w-full text-left p-3">Background color</button>
         </div>
       </div>
     </header>
     <main id="messages" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2"></main>
-    <div id="replyBox" class="hidden bg-white p-2 text-sm flex justify-between items-center border-t border-gray-200">
+    <div id="replyBox" class="hidden text-sm flex justify-between items-center" aria-live="polite">
       <div>
-        <span class="text-xs text-teal-700 font-bold block">Replying to</span>
-        <span id="replyText" class="text-gray-600 truncate block max-w-[350px]"></span>
+        <span class="text-[10px] text-teal-700 font-bold block">Replying to</span>
+        <span id="replyText" class="text-gray-600 block"></span>
       </div>
-      <button id="cancelReply" class="text-gray-500 font-bold px-2">✕</button>
+      <button id="cancelReply" type="button" class="text-gray-500 font-bold px-2" aria-label="Cancel reply">✕</button>
     </div>
-    <div class="p-2 bg-gray-100 flex items-center gap-2">
+    <div id="composer" class="p-2 bg-gray-100 flex items-center gap-2">
       <input type="file" id="mediaInput" accept="image/*" class="hidden">
+      <input type="file" id="dpInput" accept="image/*" class="hidden">
       <button id="mediaBtn" class="rounded-full bg-gray-200 text-gray-700 w-10 h-10 flex items-center justify-center text-lg font-bold">＋</button>
       <textarea id="message" rows="1" class="flex-1 rounded-2xl p-3 border resize-none outline-none" placeholder="Message"></textarea>
       <button id="send" class="rounded-full bg-teal-700 text-white w-12 h-12 flex items-center justify-center">➤</button>
@@ -87,7 +162,7 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
       <button id="reply" class="w-full text-left p-4 border-b hover:bg-gray-50">↩ Reply</button>
       <button id="edit" class="w-full text-left p-4 border-b hover:bg-gray-50">✎ Edit</button>
       <button id="deleteMe" class="w-full text-left p-4 border-b hover:bg-gray-50">Delete for me</button>
-      <button id="deleteAll" class="w-full text-left p-4 border-b text-red-600 hover:bg-gray-50">Delete for everyone (My side only)</button>
+      <button id="deleteAll" class="w-full text-left p-4 border-b text-red-600 hover:bg-gray-50 hidden">Delete for everyone</button>
       <button id="closeActions" class="w-full p-4 hover:bg-gray-50 text-gray-600">Cancel</button>
     </div>
   </div>
@@ -98,6 +173,26 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
     <div class="flex gap-4">
       <a id="downloadBtn" download="image.png" class="bg-teal-600 text-white px-6 py-3 rounded-full font-bold shadow">Download 📥</a>
       <button id="closeMedia" class="bg-gray-700 text-white px-6 py-3 rounded-full font-bold shadow">Close ✕</button>
+    </div>
+  </div>
+
+  <div id="themeModal" class="screen hidden modal flex items-center justify-center">
+    <div class="bg-white rounded-xl p-5 w-80 max-w-[90vw] shadow-lg">
+      <div class="flex justify-between items-center mb-4">
+        <b class="text-lg text-gray-800">Chat Theme</b>
+        <button id="closeTheme" class="text-gray-500 text-xl">✕</button>
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        <button data-theme="default" class="theme-btn h-20 rounded-xl border bg-[#efeae2] text-xs text-gray-700">Classic</button>
+        <button data-theme="blue" class="theme-btn h-20 rounded-xl border bg-blue-100 text-xs text-gray-700">Ocean</button>
+        <button data-theme="green" class="theme-btn h-20 rounded-xl border bg-green-100 text-xs text-gray-700">Mint</button>
+        <button data-theme="pink" class="theme-btn h-20 rounded-xl border bg-pink-100 text-xs text-gray-700">Rose</button>
+        <button data-theme="purple" class="theme-btn h-20 rounded-xl border bg-purple-100 text-xs text-gray-700">Lavender</button>
+        <button data-theme="dark" class="theme-btn h-20 rounded-xl border bg-gray-800 text-white text-xs">Dark</button>
+      </div>
+      <button id="customThemeBtn" class="w-full mt-4 p-3 rounded-lg bg-gray-100 text-gray-800 font-semibold">Custom Color</button>
+      <input id="customThemeColor" type="color" value="#efeae2" class="hidden">
+      <button id="closeThemeBottom" class="w-full mt-2 p-2 text-gray-500">Close</button>
     </div>
   </div>
 
@@ -127,7 +222,7 @@ const app = initializeApp(cfg);
 const auth = initializeAuth(app, { persistence: inMemoryPersistence });
 const db = getFirestore(app), A = "my-whatsapp-clone", $ = id => document.getElementById(id), D = (g, id) => doc(db, "artifacts", A, "public", "data", g, id), C = g => collection(db, "artifacts", A, "public", "data", g);
 
-let uid = null, myId = "", partnerId = "", room = "", unChat, unPresence, unIncoming, presenceTimer, pc, stream, callId, pending, selected = null, replyTo = null, editing = null, queued = [];
+let uid = null, myId = "", partnerId = "", room = "", unChat, unPresence, unIncoming, presenceTimer, pc, stream, callId, pending, selected = null, replyTo = null, editing = null, queued = [], replyFocusLock = false, replyFocusTimer = null;
 const login = $("login"), chat = $("chat"), call = $("call"), incoming = $("incoming");
 
 function fail(t, e) { console.error(t, e); $("loginStatus").textContent = t + " — " + (e?.code || e?.message || "failed"); }
@@ -140,24 +235,16 @@ function render(s) {
   $("messages").innerHTML = "";
   a.forEach(m => {
     if ((m.deletedFor || []).includes(myId)) return;
-    
     const r = document.createElement("div");
     r.className = "flex " + (m.senderId === myId ? "justify-end" : "justify-start");
     const b = document.createElement("div");
     b.className = "bubble " + (m.senderId === myId ? "sent" : "received") + " shadow-sm cursor-pointer";
     
-    // Exact WhatsApp Style Quoted Reply Preview Inside Bubble (Both Sides)
+    // Reply preview inside message if it's a reply
     if (m.replyTo) {
       const rep = document.createElement("div");
-      rep.className = "bg-black/10 border-l-4 border-teal-700 p-1.5 mb-1.5 text-xs rounded text-gray-800 font-medium";
-      const repTitle = document.createElement("span");
-      repTitle.className = "block text-teal-800 font-bold text-[11px]";
-      repTitle.textContent = m.replyTo.sender === myId ? "You" : partnerId;
-      const repBody = document.createElement("span");
-      repBody.className = "block truncate text-gray-700";
-      repBody.textContent = m.replyTo.text || "media";
-      rep.appendChild(repTitle);
-      rep.appendChild(repBody);
+      rep.className = "bg-black/5 border-l-4 border-teal-700 p-1 mb-1 text-xs rounded text-gray-700";
+      rep.textContent = m.replyTo.text || "media";
       b.appendChild(rep);
     }
 
@@ -181,30 +268,72 @@ function render(s) {
         b.appendChild(txt);
       }
     } else {
-      b.textContent = m.text || "";
+      // Keep the quoted reply preview AND the actual message text.
+      // Do not use textContent here because it would erase the reply preview.
+      const txt = document.createElement("div");
+      txt.replaceChildren(linkifyText(m.text || ""));
+      b.appendChild(txt);
     }
 
     const f = document.createElement("small");
-    f.className = "block text-right text-gray-500 mt-1 text-[10px]";
-    f.innerHTML = new Date(m.timestamp || 0).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + (m.senderId === myId ? " " + (m.status === "read" ? "<span class='text-blue-600'>✓✓</span>" : m.status === "delivered" ? "✓✓" : "✓") : "");
-    b.append(f);
-    
-    // Smooth Left & Right Swipe Gestures for Reply (Absolute deltaX > 40)
-    let sx = 0;
-    b.ontouchstart = e => sx = e.touches[0].clientX;
-    b.ontouchend = e => { 
-      const diff = e.changedTouches[0].clientX - sx;
-      if (Math.abs(diff) > 40) { 
-        replyTo = m; 
-        $("replyText").textContent = (m.senderId === myId ? "You: " : partnerId + ": ") + (m.text || (m.image ? "📷 Photo" : "media")); 
-        $("replyBox").classList.remove("hidden"); 
-        $("message").focus();
-      } 
-    };
+    f.className = "inline-flex items-center gap-1 text-gray-500 ml-2 align-baseline whitespace-nowrap text-[10px]";
+    f.innerHTML = new Date(m.timestamp || 0).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true
+    }) + (m.senderId === myId ? " " + (m.status === "read"
+      ? "<span class='text-blue-600'>✓✓</span>"
+      : m.status === "delivered" ? "✓✓" : "✓") : "");
 
-    b.onclick = () => { 
+    // Put time directly after the message text. For media-only messages it
+    // remains on the same line after the image.
+    if (m.image && !m.text) {
+      b.append(f);
+    } else {
+      const last = b.lastElementChild;
+      if (last) {
+        last.appendChild(f);
+      } else {
+        b.append(f);
+      }
+    }
+    
+    // Swipe reply: slide either LEFT or RIGHT on any message.
+    let sx = 0, sy = 0, swiping = false;
+    b.ontouchstart = e => {
+      if (!e.touches[0]) return;
+      sx = e.touches[0].clientX;
+      sy = e.touches[0].clientY;
+      swiping = false;
+    };
+    b.ontouchmove = e => {
+      if (!e.touches[0]) return;
+      const dx = e.touches[0].clientX - sx;
+      const dy = e.touches[0].clientY - sy;
+      // Only treat it as a horizontal swipe when horizontal movement wins.
+      swiping = Math.abs(dx) > 35 && Math.abs(dx) > Math.abs(dy);
+    };
+    b.ontouchend = e => {
+      if (!e.changedTouches[0]) return;
+      const dx = e.changedTouches[0].clientX - sx;
+      const dy = e.changedTouches[0].clientY - sy;
+
+      if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy)) {
+        e.preventDefault();
+        e.stopPropagation();
+        showReplyBubble(m);
+        swiping = true;
+        // Prevent the following click event from opening the action menu.
+        b.dataset.swipeReply = "1";
+        setTimeout(() => { delete b.dataset.swipeReply; }, 350);
+      }
+    };
+    b.onclick = () => {
+      if (b.dataset.swipeReply === "1") return;
       selected = m; 
-      $("actions").classList.remove("hidden"); 
+      $("actions").classList.remove("hidden");
+      // "Delete for everyone" is only available for messages sent by me.
+      $("deleteAll").classList.toggle("hidden", m.senderId !== myId || m.isDeleted);
       $("edit").classList.toggle("hidden", !(m.senderId === myId && !m.isDeleted && !m.image)); 
     };
     r.append(b);
@@ -212,6 +341,35 @@ function render(s) {
     if (m.senderId !== myId && m.status !== "read") updateDoc(doc(C("chat_" + room), m.id), { status: "read" }).catch(() => {});
   });
   $("messages").scrollTop = $("messages").scrollHeight;
+}
+
+function focusReplyInput() {
+  const input = $("message");
+  if (!input || !replyFocusLock) return;
+  input.classList.add("reply-lock");
+  input.focus({ preventScroll: true });
+  // A second focus attempt helps on mobile browsers after a touch event.
+  clearTimeout(replyFocusTimer);
+  replyFocusTimer = setTimeout(() => {
+    if (replyFocusLock && document.activeElement !== input) input.focus({ preventScroll: true });
+  }, 60);
+}
+
+function showReplyBubble(message) {
+  replyTo = message;
+  $("replyText").textContent = message.text || "media";
+  $("replyBox").classList.remove("hidden");
+  replyFocusLock = true;
+  focusReplyInput();
+}
+
+function hideReplyBubble() {
+  replyFocusLock = false;
+  clearTimeout(replyFocusTimer);
+  replyFocusTimer = null;
+  replyTo = null;
+  $("replyBox").classList.add("hidden");
+  $("message").classList.remove("reply-lock");
 }
 
 async function send(imgData = null) {
@@ -224,20 +382,15 @@ async function send(imgData = null) {
     } else {
       const d = { text: text || "", senderId: myId, timestamp: Date.now(), status: "sent", deletedFor: [], isDeleted: false };
       if (imgData) d.image = imgData;
-      if (replyTo) { 
-        d.replyTo = { 
-          id: replyTo.id, 
-          sender: replyTo.senderId,
-          text: replyTo.text || (replyTo.image ? "📷 Photo" : "media") 
-        }; 
-        replyTo = null; 
-        $("replyBox").classList.add("hidden"); 
+      if (replyTo) {
+        d.replyTo = { id: replyTo.id, text: replyTo.text || "media" };
       }
       await setDoc(doc(C("chat_" + room), "msg_" + Date.now() + Math.random().toString(36).slice(2, 7)), d);
     }
     i.value = "";
-    // Lock and securely maintain keyboard focus after sending
-    setTimeout(() => i.focus(), 50);
+    // Sending must not dismiss the native keyboard.
+    if (replyTo) hideReplyBubble();
+    requestAnimationFrame(() => i.focus({ preventScroll: true }));
   } catch (e) { fail("Message send failed", e); }
 }
 
@@ -276,79 +429,349 @@ function listenIncoming() {
   });
 }
 
-const rtc = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
-function reset() { pc?.close(); stream?.getTracks().forEach(t => t.stop()); pc = null; stream = null; call.classList.add("hidden"); chat.classList.remove("hidden"); }
+// WebRTC configuration.
+// STUN helps discover public network addresses. A TURN server is strongly
+// recommended for production because some mobile networks/WebViews cannot
+// connect peer-to-peer without relay support.
+const rtc = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" }
+    // Add your TURN server here when available:
+    // { urls: "turn:YOUR_TURN_HOST:3478", username: "USERNAME", credential: "PASSWORD" }
+  ],
+  iceCandidatePoolSize: 10
+};
+
+let unAnswer = null;
+let unCandidates = null;
+let callEnded = false;
+
+function showCallError(title, e) {
+  console.error(title, e);
+  $("callState").textContent = title;
+  alert(title + (e?.message ? "\n\n" + e.message : ""));
+}
+
+function cleanupCallListeners() {
+  try { unAnswer?.(); } catch {}
+  try { unCandidates?.(); } catch {}
+  unAnswer = null;
+  unCandidates = null;
+}
+
+async function playRemoteAudio() {
+  const remote = $("remote");
+  remote.muted = false;
+  remote.volume = 1;
+  try {
+    await remote.play();
+  } catch (e) {
+    console.warn("Remote media autoplay was blocked:", e);
+    $("callState").textContent = "Tap Speaker to enable audio";
+  }
+}
+
+function reset() {
+  callEnded = true;
+  cleanupCallListeners();
+  try { pc?.close(); } catch {}
+  try { stream?.getTracks().forEach(t => t.stop()); } catch {}
+  pc = null;
+  stream = null;
+  pending = null;
+  queued = [];
+  $("remote").srcObject = null;
+  $("local").srcObject = null;
+  incoming.classList.add("hidden");
+  call.classList.add("hidden");
+  chat.classList.remove("hidden");
+}
 
 function peer(caller) {
   pc = new RTCPeerConnection(rtc);
-  stream.getTracks().forEach(t => pc.addTrack(t, stream));
-  pc.ontrack = e => { $("remote").srcObject = e.streams[0]; $("callState").textContent = "Connected"; };
-  pc.onicecandidate = e => e.candidate && setDoc(doc(collection(db, "artifacts", A, "public", "data", "call_candidates", callId, caller ? myId : partnerId)), e.candidate.toJSON()).catch(console.warn);
+
+  if (stream) {
+    stream.getTracks().forEach(t => pc.addTrack(t, stream));
+  }
+
+  pc.ontrack = async e => {
+    if (e.streams?.[0]) {
+      $("remote").srcObject = e.streams[0];
+      $("callState").textContent = "Connected";
+      await playRemoteAudio();
+    }
+  };
+
+  pc.onicecandidate = e => {
+    if (!e.candidate || !callId) return;
+    const owner = caller ? myId : partnerId;
+    setDoc(
+      doc(collection(db, "artifacts", A, "public", "data", "call_candidates", callId, owner)),
+      e.candidate.toJSON()
+    ).catch(console.warn);
+  };
+
+  pc.onconnectionstatechange = () => {
+    const state = pc?.connectionState;
+    if (state === "connected") $("callState").textContent = "Connected";
+    else if (state === "connecting") $("callState").textContent = "Connecting…";
+    else if (state === "disconnected") $("callState").textContent = "Connection interrupted";
+    else if (state === "failed") $("callState").textContent = "Connection failed";
+    else if (state === "closed") $("callState").textContent = "Call ended";
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    console.log("ICE state:", pc?.iceConnectionState);
+  };
+
   return pc;
 }
 
+async function addQueuedCandidates() {
+  if (!pc?.remoteDescription) return;
+  for (const c of queued.splice(0)) {
+    try { await pc.addIceCandidate(c); } catch (e) { console.warn("ICE add failed", e); }
+  }
+}
+
 function watch(owner) {
-  return onSnapshot(collection(db, "artifacts", A, "public", "data", "call_candidates", callId, owner), s => s.docChanges().forEach(async x => {
-    if (x.type !== "added" || !pc) return;
-    const c = new RTCIceCandidate(x.doc.data());
-    if (pc.remoteDescription) await pc.addIceCandidate(c);
-    else queued.push(c);
-  }));
+  unCandidates?.();
+  unCandidates = onSnapshot(
+    collection(db, "artifacts", A, "public", "data", "call_candidates", callId, owner),
+    async s => {
+      for (const x of s.docChanges()) {
+        if (x.type !== "added" || !pc) continue;
+        try {
+          const c = new RTCIceCandidate(x.doc.data());
+          if (pc.remoteDescription) await pc.addIceCandidate(c);
+          else queued.push(c);
+        } catch (e) {
+          console.warn("Invalid ICE candidate:", e);
+        }
+      }
+    },
+    e => console.warn("ICE signaling error:", e)
+  );
 }
 
 async function mediaStream(video) {
-  try { return await navigator.mediaDevices.getUserMedia({ audio: true, video }); } catch (e) { fail("Microphone/Camera permission failed", e); }
+  if (!window.isSecureContext) {
+    showCallError("Calls require HTTPS. Open this site over HTTPS.");
+    return null;
+  }
+
+  if (!window.RTCPeerConnection) {
+    showCallError("WebRTC is not available in this browser/WebView.");
+    return null;
+  }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showCallError(
+      "This browser/WebView does not allow microphone/camera access. " +
+      "Please allow microphone/camera permission for this browser or app, then try again."
+    );
+    return null;
+  }
+
+  const audio = {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true,
+    channelCount: 1
+  };
+
+  const videoConstraints = {
+    facingMode: { ideal: "user" },
+    width: { ideal: 1280, max: 1920 },
+    height: { ideal: 720, max: 1080 }
+  };
+
+  try {
+    // Ask for both tracks in one permission request for video calls.
+    return await navigator.mediaDevices.getUserMedia({
+      audio,
+      video: video ? videoConstraints : false
+    });
+  } catch (e) {
+    console.error("getUserMedia failed:", e);
+
+    // Some WebViews fail on video constraints even though the microphone works.
+    // For an audio call, retry with the simplest possible audio request.
+    if (!video && (e?.name === "OverconstrainedError" || e?.name === "NotReadableError")) {
+      try {
+        return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } catch (e2) {
+        e = e2;
+      }
+    }
+
+    const name = e?.name || "";
+    const msg =
+      name === "NotAllowedError" || name === "PermissionDeniedError"
+        ? "Microphone/Camera permission is blocked. Allow microphone/camera permission for this site in browser/app settings."
+        : name === "NotFoundError"
+        ? "No microphone/camera was found on this device."
+        : name === "NotReadableError"
+        ? "The microphone/camera is busy or cannot be opened by this WebView."
+        : name === "SecurityError"
+        ? "The WebView blocked microphone/camera access for security reasons."
+        : name === "AbortError"
+        ? "The microphone/camera request was interrupted. Try the call again."
+        : "Microphone/Camera permission failed. Please allow camera and microphone access in your browser/app settings.";
+
+    showCallError(msg, e);
+    return null;
+  }
 }
 
 async function start(video) {
+  // This function must be called directly from the user's tap/click.
+  // That is important because mobile browsers/WebViews may only allow
+  // getUserMedia after a user gesture.
+  if (!uid) {
+    alert("Firebase is not connected yet.");
+    return;
+  }
+
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    showCallError(
+      "This WebView cannot access microphone/camera. " +
+      "If the browser or app blocks the permission, JavaScript cannot bypass that restriction. " +
+      "Open the same HTTPS page in Chrome for calling."
+    );
+    return;
+  }
+  if (!partnerId) {
+    alert("Partner ID is missing.");
+    return;
+  }
+
+  callEnded = false;
+  $("callState").textContent = "Requesting permission…";
+
   stream = await mediaStream(video);
   if (!stream) return;
-  callId = room + "_" + Date.now();
+
+  callId = room + "_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+
   $("local").srcObject = stream;
   $("local").classList.toggle("hidden", !video);
   $("remote").classList.toggle("hidden", !video);
   $("audioOnly").classList.toggle("hidden", video);
   $("callName").textContent = partnerId;
+  $("callState").textContent = "Calling…";
+  $("speaker").textContent = "🔊 Speaker On";
+  speakerOn = true;
+
   chat.classList.add("hidden");
   call.classList.remove("hidden");
-  peer(true);
-  const o = await pc.createOffer();
-  await pc.setLocalDescription(o);
-  await setDoc(D("active_calls", partnerId), { caller: myId, type: video ? "video" : "audio", offer: { type: o.type, sdp: o.sdp }, callId, timestamp: Date.now() });
-  onSnapshot(D("call_answers", callId), async s => {
-    const d = s.data();
-    if (d?.answer && !pc.currentRemoteDescription) {
-      await pc.setRemoteDescription(d.answer);
-      for (const c of queued) await pc.addIceCandidate(c);
-      queued = [];
-    }
-  });
-  watch(partnerId);
+
+  try {
+    peer(true);
+
+    const offer = await pc.createOffer({
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: video
+    });
+    await pc.setLocalDescription(offer);
+
+    await setDoc(
+      D("active_calls", partnerId),
+      {
+        caller: myId,
+        type: video ? "video" : "audio",
+        offer: { type: offer.type, sdp: offer.sdp },
+        callId,
+        timestamp: Date.now()
+      }
+    );
+
+    // The call invitation has reached Firebase/partner's incoming-call listener.
+    // Keep the caller on "Ringing…" until the other side accepts.
+    $("callState").textContent = "Ringing…";
+
+    unAnswer = onSnapshot(D("call_answers", callId), async s => {
+      const d = s.data();
+      if (!d?.answer || !pc || pc.currentRemoteDescription || callEnded) return;
+
+      try {
+        await pc.setRemoteDescription(d.answer);
+        await addQueuedCandidates();
+      } catch (e) {
+        showCallError("Could not establish the call.", e);
+      }
+    });
+
+    watch(partnerId);
+  } catch (e) {
+    showCallError("Could not start the call.", e);
+    reset();
+  }
 }
 
 async function acceptCall() {
   const d = pending;
+  if (!d?.offer || !d?.callId) return;
+
+  callEnded = false;
   stream = await mediaStream(d.type === "video");
   if (!stream) return;
+
   callId = d.callId;
   partnerId = d.caller;
+
   $("local").srcObject = stream;
+  $("local").classList.toggle("hidden", d.type !== "video");
+  $("remote").classList.toggle("hidden", d.type !== "video");
+  $("audioOnly").classList.toggle("hidden", d.type === "video");
+  $("callName").textContent = partnerId;
+  $("callState").textContent = "Connecting…";
+  $("speaker").textContent = "🔊 Speaker On";
+  speakerOn = true;
+
   incoming.classList.add("hidden");
   chat.classList.add("hidden");
   call.classList.remove("hidden");
-  peer(false);
-  await pc.setRemoteDescription(d.offer);
-  const a = await pc.createAnswer();
-  await pc.setLocalDescription(a);
-  await setDoc(D("call_answers", callId), { answer: { type: a.type, sdp: a.sdp } });
-  watch(d.caller);
-  await deleteDoc(D("active_calls", myId));
-  pending = null;
+
+  try {
+    peer(false);
+
+    await pc.setRemoteDescription(d.offer);
+    await addQueuedCandidates();
+
+    const answer = await pc.createAnswer({
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: d.type === "video"
+    });
+    await pc.setLocalDescription(answer);
+
+    await setDoc(
+      D("call_answers", callId),
+      { answer: { type: answer.type, sdp: answer.sdp } }
+    );
+
+    watch(d.caller);
+
+    await deleteDoc(D("active_calls", myId)).catch(() => {});
+    pending = null;
+  } catch (e) {
+    showCallError("Could not accept the call.", e);
+    reset();
+  }
 }
 
 $("myId").value = localStorage.getItem("whatsapp_my_id") || "";
 $("connect").onclick = setup;
-$("send").onclick = () => send();
+$("send").addEventListener("pointerdown", e => {
+  // Do not let the send button steal focus from the textarea.
+  // This keeps Android's native keyboard open while sending.
+  e.preventDefault();
+  $("message").focus({ preventScroll: true });
+});
+$("send").onclick = () => {
+  $("message").focus({ preventScroll: true });
+  send().finally(() => $("message").focus({ preventScroll: true }));
+};
 $("message").onkeydown = e => { 
   if (e.key === "Enter" && !e.shiftKey) { 
     e.preventDefault(); 
@@ -356,23 +779,133 @@ $("message").onkeydown = e => {
   } 
 };
 
-$("audioCall").onclick = () => start(false);
-$("videoCall").onclick = () => start(true);
+// Keep the native keyboard/input focused while the compact reply bubble is visible.
+$("message").addEventListener("blur", () => {
+  // Keep the composer focused. Android's Back button can still hide the
+  // native keyboard; normal send/touch actions won't dismiss it.
+  setTimeout(() => {
+    if (document.visibilityState === "visible" && document.activeElement !== $("message")) {
+      $("message").focus({ preventScroll: true });
+    }
+  }, 0);
+});
+$("message").addEventListener("focus", () => {
+  $("message").classList.add("reply-lock");
+});
+
+let callTapLocked = false;
+
+async function callFromTap(video) {
+  if (callTapLocked) return;
+  callTapLocked = true;
+  try {
+    await start(video);
+  } finally {
+    setTimeout(() => { callTapLocked = false; }, 700);
+  }
+}
+
+$("audioCall").addEventListener("click", e => {
+  e.preventDefault();
+  callFromTap(false);
+});
+
+$("videoCall").addEventListener("click", e => {
+  e.preventDefault();
+  callFromTap(true);
+});
 $("accept").onclick = () => acceptCall().catch(e => fail("Accept call failed", e));
 $("reject").onclick = () => { incoming.classList.add("hidden"); if (pending) deleteDoc(D("active_calls", myId)); pending = null; };
-$("end").onclick = reset;
+$("end").onclick = async () => {
+  try {
+    if (callId) await deleteDoc(D("active_calls", partnerId)).catch(() => {});
+  } finally {
+    reset();
+  }
+};
 $("mute").onclick = () => { const t = stream?.getAudioTracks()[0]; if (t) { t.enabled = !t.enabled; $("mute").textContent = t.enabled ? "🎙 Mute" : "🔇 Unmute"; } };
 
-let speakerOn = false;
-$("speaker").onclick = () => {
+let speakerOn = true;
+$("speaker").onclick = async () => {
   speakerOn = !speakerOn;
   const remoteVideo = $("remote");
   remoteVideo.muted = !speakerOn;
+  remoteVideo.volume = speakerOn ? 1 : 0;
   $("speaker").textContent = speakerOn ? "🔊 Speaker On" : "🔈 Earpiece";
+  if (speakerOn) {
+    try { await remoteVideo.play(); } catch (e) { console.warn(e); }
+  }
 };
 
 $("toggleVideo").onclick = () => { const t = stream?.getVideoTracks()[0]; if (t) t.enabled = !t.enabled; };
 $("menuBtn").onclick = () => $("menu").classList.toggle("hidden");
+
+$("dpBtn").onclick = () => $("dpInput").click();
+
+$("dpInput").onchange = e => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) return alert("Please select an image.");
+  const reader = new FileReader();
+  reader.onload = event => {
+    $("partnerDp").src = event.target.result;
+    $("partnerDp").classList.remove("hidden");
+    $("dpPlaceholder").classList.add("hidden");
+    localStorage.setItem("chat-dp", event.target.result);
+  };
+  reader.readAsDataURL(file);
+};
+
+function applyTheme(name, customColor = null) {
+  const themes = {
+    default: "#efeae2",
+    blue: "#dbeafe",
+    green: "#dcfce7",
+    pink: "#fce7f3",
+    purple: "#f3e8ff",
+    dark: "#1f2937"
+  };
+  const bg = customColor || themes[name] || themes.default;
+  $("chat").style.background = bg;
+  $("chat").dataset.theme = name || "custom";
+  $("messages").style.color = name === "dark" ? "#fff" : "";
+  localStorage.setItem("chat-theme", JSON.stringify({ name: name || "custom", color: bg }));
+}
+
+$("themeBtn").onclick = () => {
+  $("themeModal").classList.remove("hidden");
+  $("menu").classList.add("hidden");
+};
+
+$("closeTheme").onclick = () => $("themeModal").classList.add("hidden");
+$("closeThemeBottom").onclick = () => $("themeModal").classList.add("hidden");
+
+document.querySelectorAll(".theme-btn").forEach(btn => {
+  btn.onclick = () => {
+    applyTheme(btn.dataset.theme);
+    $("themeModal").classList.add("hidden");
+  };
+});
+
+$("customThemeBtn").onclick = () => $("customThemeColor").click();
+$("customThemeColor").oninput = e => {
+  applyTheme("custom", e.target.value);
+};
+
+const savedDp = localStorage.getItem("chat-dp");
+if (savedDp) {
+  $("partnerDp").src = savedDp;
+  $("partnerDp").classList.remove("hidden");
+  $("dpPlaceholder").classList.add("hidden");
+}
+
+const savedTheme = localStorage.getItem("chat-theme");
+if (savedTheme) {
+  try {
+    const t = JSON.parse(savedTheme);
+    applyTheme(t.name, t.color);
+  } catch {}
+}
 $("bgBtn").onclick = () => { $("colors").classList.remove("hidden"); $("menu").classList.add("hidden"); };
 $("closeColors").onclick = () => $("colors").classList.add("hidden");
 document.querySelectorAll("[data-bg]").forEach(b => b.onclick = () => { chat.style.background = b.dataset.bg; localStorage.setItem("chat-bg", b.dataset.bg); $("colors").classList.add("hidden"); });
@@ -405,17 +938,12 @@ $("mediaInput").onchange = e => {
 };
 
 $("closeMedia").onclick = () => $("mediaModal").classList.add("hidden");
-$("cancelReply").onclick = () => { $("replyBox").classList.add("hidden"); replyTo = null; };
+$("cancelReply").onclick = () => { hideReplyBubble(); };
 $("closeActions").onclick = () => $("actions").classList.add("hidden");
 
-$("reply").onclick = () => { 
-  if (selected) {
-    replyTo = selected; 
-    $("replyText").textContent = (selected.senderId === myId ? "You: " : partnerId + ": ") + (selected.text || (selected.image ? "📷 Photo" : "media")); 
-    $("replyBox").classList.remove("hidden"); 
-  }
-  $("actions").classList.add("hidden"); 
-  $("message").focus(); 
+$("reply").onclick = () => {
+  if (selected) showReplyBubble(selected);
+  $("actions").classList.add("hidden");
 };
 
 $("edit").onclick = () => { 
@@ -425,19 +953,57 @@ $("edit").onclick = () => {
   $("actions").classList.add("hidden"); 
 };
 
-$("deleteMe").onclick = async () => { 
-  if (selected) await updateDoc(doc(C("chat_" + room), selected.id), { deletedFor: [...(selected.deletedFor || []), myId] }); 
-  $("actions").classList.add("hidden"); 
-};
+$("deleteMe").onclick = async () => { if (selected) await updateDoc(doc(C("chat_" + room), selected.id), { deletedFor: [...(selected.deletedFor || []), myId] }); $("actions").classList.add("hidden"); };
+$("deleteAll").onclick = async () => { if (selected) await updateDoc(doc(C("chat_" + room), selected.id), { isDeleted: true, text: "", image: "", replyTo: null }); $("actions").classList.add("hidden"); };
 
-$("deleteAll").onclick = async () => { 
-  if (selected) {
-    await updateDoc(doc(C("chat_" + room), selected.id), { deletedFor: [...(selected.deletedFor || []), myId] });
-  } 
-  $("actions").classList.add("hidden"); 
-};
+// ShareChat / in-app browser detection.
+// JavaScript cannot grant a permission that the host WebView has disabled.
+const ua = navigator.userAgent || "";
+const inAppBrowser =
+  /; wv\)/i.test(ua) ||
+  (/Android/i.test(ua) && /Version\/\d+\.\d+/i.test(ua) && /Chrome/i.test(ua));
+
+if (inAppBrowser) {
+  console.info("In-app/WebView detected. WebRTC depends on host permission support.");
+}
+
+// Basic compatibility check. This does not bypass restrictions imposed by an
+// in-app browser; it only gives a useful message instead of failing silently.
+if (!window.isSecureContext) {
+  $("loginStatus").textContent = "⚠️ HTTPS is required for calls";
+}
+if (!window.RTCPeerConnection) {
+  console.warn("WebRTC RTCPeerConnection is not available in this browser.");
+}
+if (!navigator.mediaDevices?.getUserMedia) {
+  console.warn("getUserMedia is not available in this browser/WebView.");
+}
 
 const timer = setTimeout(() => { if (!uid) { $("loginStatus").textContent = "Firebase timeout — check Anonymous Auth"; } }, 12000);
+
+function syncAppToVisualViewport() {
+  const vv = window.visualViewport;
+  if (!vv) {
+    document.documentElement.style.setProperty("--app-height", `${window.innerHeight}px`);
+    return;
+  }
+
+  // visualViewport.height becomes the visible area above the Android keyboard.
+  // Keep the whole chat inside that area so the composer follows the keyboard.
+  document.documentElement.style.setProperty("--app-height", `${vv.height}px`);
+
+  // Keep the focused input visible after the viewport changes.
+  if (document.activeElement === $("message")) {
+    requestAnimationFrame(() => {
+      $("message").scrollIntoView({ block: "nearest", inline: "nearest" });
+    });
+  }
+}
+
+syncAppToVisualViewport();
+window.addEventListener("resize", syncAppToVisualViewport, { passive: true });
+window.visualViewport?.addEventListener("resize", syncAppToVisualViewport, { passive: true });
+window.visualViewport?.addEventListener("scroll", syncAppToVisualViewport, { passive: true });
 
 signInAnonymously(auth).catch(e => fail("Firebase auth failed", e));
 onAuthStateChanged(auth, u => {

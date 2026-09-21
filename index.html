@@ -281,6 +281,7 @@ body{
   <div id="actions" class="screen hidden modal flex items-center justify-center">
     <div class="bg-white rounded w-64 overflow-hidden shadow-lg">
       <button id="reply" class="w-full text-left p-4 border-b hover:bg-gray-50">↩ Reply</button>
+      <button id="copy" class="w-full text-left p-4 border-b hover:bg-gray-50">📋 Copy</button>
       <button id="edit" class="w-full text-left p-4 border-b hover:bg-gray-50">✎ Edit</button>
       <button id="deleteMe" class="w-full text-left p-4 border-b hover:bg-gray-50">Delete for me</button>
       <button id="deleteAll" class="w-full text-left p-4 border-b text-red-600 hover:bg-gray-50 hidden">Delete for everyone</button>
@@ -1197,6 +1198,33 @@ $("closeActions").onclick = () => $("actions").classList.add("hidden");
 
 $("reply").onclick = () => {
   if (selected) showReplyBubble(selected);
+  $("actions").classList.add("hidden");
+};
+
+$("copy").onclick = async () => {
+  if (!selected) return;
+
+  const text = selected.text || "";
+  if (!text) {
+    $("actions").classList.add("hidden");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    // Fallback for browsers/WebViews where Clipboard API is unavailable.
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand("copy"); } catch (_) {}
+    ta.remove();
+  }
+
   $("actions").classList.add("hidden");
 };
 

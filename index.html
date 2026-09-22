@@ -812,6 +812,7 @@ function stopCallTimer() {
 }
 
 function reset() {
+  releaseCallWakeLock();
   stopCallTimer();
   callEnded = true;
   cleanupCallListeners();
@@ -1001,6 +1002,7 @@ async function mediaStream(video) {
 }
 
 async function start(video) {
+  callStartedVideo = !!video;
   // This function must be called directly from the user's tap/click.
   // That is important because mobile browsers/WebViews may only allow
   // getUserMedia after a user gesture.
@@ -1115,6 +1117,7 @@ async function acceptCall() {
   if (!d?.offer || !d?.callId) return;
 
   callEnded = false;
+  callStartedVideo = d.type === "video";
   stream = await mediaStream(d.type === "video");
   if (!stream) return;
 
@@ -1213,10 +1216,85 @@ $("message").addEventListener("focus", () => {
 });
 
 let callTapLocked = false;
+let callStartedVideo = false;
+let callWakeLock = null;
+let callBeforeUnloadGuard = false;
+
+
+async function acquireCallWakeLock() {
+  try {
+    if ("wakeLock" in navigator && !callWakeLock) {
+      callWakeLock = await navigator.wakeLock.request("screen");
+      callWakeLock.addEventListener("release", () => { callWakeLock = null; });
+    }
+  } catch (e) {
+    console.warn("Wake Lock unavailable:", e);
+  }
+}
+
+async function releaseCallWakeLock() {
+  try { await callWakeLock?.release(); } catch {}
+  callWakeLock = null;
+}
+
+async function enableBackgroundCallMode() {
+  if (!callId) return;
+
+  // Keep media tracks enabled while the page is backgrounded.
+  stream?.getAudioTracks().forEach(t => { t.enabled = true; });
+  if (callStartedVideo) {
+    stream?.getVideoTracks().forEach(t => { t.enabled = true; });
+  }
+
+  await acquireCallWakeLock();
+
+  // If the browser supports a persistent notification, tell the user
+  // that the call is still active when they leave the chat screen.
+  if (document.hidden && "Notification" in window && Notification.permission === "granted") {
+    try {
+      new Notification("Call in progress", {
+        body: "Your call is still active. Return to the app to control it.",
+        tag: "secure-cloud-active-call",
+        renotify: false
+      });
+    } catch {}
+  }
+}
+
+function installBackgroundCallHandling() {
+  document.addEventListener("visibilitychange", async () => {
+    if (!callId || callEnded) return;
+
+    if (document.hidden) {
+      await enableBackgroundCallMode();
+    } else {
+      await acquireCallWakeLock();
+      try { await $("remote").play(); } catch {}
+    }
+  });
+
+  window.addEventListener("pagehide", () => {
+    // Do NOT end an active call merely because the page becomes hidden.
+    // Browser/WebView policies still decide whether WebRTC can continue.
+  });
+
+  window.addEventListener("beforeunload", e => {
+    if (callId && !callEnded) {
+      // Prevent accidental navigation/reload from silently destroying the call.
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  });
+}
+
+installBackgroundCallHandling();
 
 async function callFromTap(video) {
   if (callTapLocked) return;
   callTapLocked = true;
+  if ("Notification" in window && Notification.permission === "default") {
+    await Notification.requestPermission().catch(() => {});
+  }
   try {
     await start(video);
   } finally {
@@ -1233,7 +1311,16 @@ $("videoCall").addEventListener("click", e => {
   e.preventDefault();
   callFromTap(true);
 });
-$("accept").onclick = () => acceptCall().catch(e => fail("Accept call failed", e));
+$("accept").onclick = async () => {
+  try {
+    if ("Notification" in window && Notification.permission === "default") {
+      await Notification.requestPermission().catch(() => {});
+    }
+    await acceptCall();
+  } catch (e) {
+    fail("Accept call failed", e);
+  }
+};
 $("reject").onclick = async () => {
   const d = pending;
   incoming.classList.add("hidden");

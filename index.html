@@ -675,14 +675,20 @@ function setup() {
 }
 
 function listenIncoming() {
+  unIncoming?.();
   unIncoming = onSnapshot(D("active_calls", myId), s => {
     const d = s.data();
-    if (d && d.caller && Date.now() - d.timestamp < 30000) {
+    if (d && d.caller && Date.now() - Number(d.timestamp || 0) < 30000) {
       pending = d;
-      $("caller").textContent = d.caller + " is calling";
+      $("caller").textContent = d.caller + (d.type === "video" ? " is video calling" : " is calling");
       incoming.classList.remove("hidden");
+    } else {
+      // Caller cancelled / call timed out: return immediately to inbox.
+      pending = null;
+      incoming.classList.add("hidden");
+      if (call.classList.contains("hidden")) chat.classList.remove("hidden");
     }
-  });
+  }, e => console.warn("Incoming call listener error:", e));
 }
 
 // WebRTC configuration.
@@ -700,6 +706,7 @@ const rtc = {
 
 let unAnswer = null;
 let unCandidates = null;
+let unCallState = null;
 let callEnded = false;
 let callConnectedAt = 0;
 let callDurationTimer = null;
@@ -713,8 +720,58 @@ function showCallError(title, e) {
 function cleanupCallListeners() {
   try { unAnswer?.(); } catch {}
   try { unCandidates?.(); } catch {}
+  try { unCallState?.(); } catch {}
   unAnswer = null;
   unCandidates = null;
+  unCallState = null;
+}
+
+function watchCallState() {
+  if (!callId) return;
+  unCallState?.();
+  unCallState = onSnapshot(D("call_state", callId), snap => {
+    const d = snap.data();
+
+    // Both peers watch the same call-state document. If either side ends
+    // or rejects the call, both sides immediately return to the chat screen.
+    if (!d || d.ended || d.status === "rejected" || d.status === "cancelled") {
+      if (!callEnded) {
+        callEnded = true;
+        reset();
+      }
+      return;
+    }
+
+    if (d.connectedAt && !callConnectedAt) {
+      startCallTimer(d.connectedAt);
+    }
+  }, e => console.warn("Call state listener error:", e));
+}
+
+async function finishCall(status = "ended") {
+  const id = callId;
+  const other = partnerId;
+  callEnded = true;
+
+  if (id) {
+    await setDoc(D("call_state", id), {
+      ended: true,
+      status,
+      endedBy: myId,
+      endedAt: Date.now()
+    }, { merge: true }).catch(() => {});
+
+    if (other) {
+      await deleteDoc(D("active_calls", other)).catch(() => {});
+    }
+  }
+
+  // Allow the other peer to receive the state before removing the document.
+  setTimeout(() => {
+    if (id) deleteDoc(D("call_state", id)).catch(() => {});
+  }, 2000);
+
+  reset();
 }
 
 async function playRemoteAudio() {
@@ -778,12 +835,27 @@ function peer(caller) {
     stream.getTracks().forEach(t => pc.addTrack(t, stream));
   }
 
+  let remoteStream = null;
+
   pc.ontrack = async e => {
-    if (e.streams?.[0]) {
-      $("remote").srcObject = e.streams[0];
-      $("callState").textContent = "Connected";
-      if (!callConnectedAt) startCallTimer(Date.now());
-      await playRemoteAudio();
+    if (!remoteStream) remoteStream = e.streams?.[0] || new MediaStream();
+
+    if (!e.streams?.[0]) {
+      const exists = remoteStream.getTracks().some(t => t.id === e.track.id);
+      if (!exists) remoteStream.addTrack(e.track);
+    }
+
+    $("remote").srcObject = remoteStream;
+    $("remote").muted = false;
+    $("remote").volume = 1;
+    $("callState").textContent = "Connected";
+    if (!callConnectedAt) startCallTimer(Date.now());
+
+    try {
+      await $("remote").play();
+    } catch (err) {
+      console.warn("Remote media autoplay was blocked:", err);
+      $("callState").textContent = "Tap Speaker to enable audio";
     }
   };
 
@@ -879,7 +951,9 @@ async function mediaStream(video) {
     echoCancellation: true,
     noiseSuppression: true,
     autoGainControl: true,
-    channelCount: 1
+    channelCount: 1,
+    sampleRate: { ideal: 48000 },
+    sampleSize: { ideal: 16 }
   };
 
   const videoConstraints = {
@@ -954,6 +1028,16 @@ async function start(video) {
   stream = await mediaStream(video);
   if (!stream) return;
 
+  // Re-apply browser DSP after permission is granted.
+  const audioTrack = stream.getAudioTracks()[0];
+  if (audioTrack?.applyConstraints) {
+    audioTrack.applyConstraints({
+      echoCancellation: { ideal: true },
+      noiseSuppression: { ideal: true },
+      autoGainControl: { ideal: true }
+    }).catch(() => {});
+  }
+
   callId = room + "_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
 
   $("local").srcObject = stream;
@@ -989,9 +1073,23 @@ async function start(video) {
       }
     );
 
-    // The call invitation has reached Firebase/partner's incoming-call listener.
+    await setDoc(D("call_state", callId), {
+      status: "ringing",
+      caller: myId,
+      callee: partnerId,
+      createdAt: Date.now()
+    }, { merge: true });
+    watchCallState();
+
     // Keep the caller on "Ringing…" until the other side accepts.
     $("callState").textContent = "Ringing…";
+    await setDoc(D("call_state", callId), {
+      status: "ringing",
+      caller: myId,
+      callee: partnerId,
+      createdAt: Date.now()
+    }, { merge: true });
+    watchCallState();
 
     unAnswer = onSnapshot(D("call_answers", callId), async s => {
       const d = s.data();
@@ -1019,6 +1117,15 @@ async function acceptCall() {
   callEnded = false;
   stream = await mediaStream(d.type === "video");
   if (!stream) return;
+
+  const audioTrack = stream.getAudioTracks()[0];
+  if (audioTrack?.applyConstraints) {
+    audioTrack.applyConstraints({
+      echoCancellation: { ideal: true },
+      noiseSuppression: { ideal: true },
+      autoGainControl: { ideal: true }
+    }).catch(() => {});
+  }
 
   callId = d.callId;
   partnerId = d.caller;
@@ -1055,8 +1162,12 @@ async function acceptCall() {
     );
 
     const connectedAt = Date.now();
-    await setDoc(D("call_state", callId), { connectedAt }, { merge: true });
+    await setDoc(D("call_state", callId), {
+      status: "connected",
+      connectedAt
+    }, { merge: true });
     startCallTimer(connectedAt);
+    watchCallState();
 
     watch(d.caller);
 
@@ -1123,17 +1234,31 @@ $("videoCall").addEventListener("click", e => {
   callFromTap(true);
 });
 $("accept").onclick = () => acceptCall().catch(e => fail("Accept call failed", e));
-$("reject").onclick = () => { incoming.classList.add("hidden"); if (pending) deleteDoc(D("active_calls", myId)); pending = null; };
-$("end").onclick = async () => {
-  try {
-    if (callId) {
-      await deleteDoc(D("active_calls", partnerId)).catch(() => {});
-      await deleteDoc(D("call_state", callId)).catch(() => {});
-      await deleteDoc(D("call_answers", callId)).catch(() => {});
-    }
-  } finally {
-    reset();
+$("reject").onclick = async () => {
+  const d = pending;
+  incoming.classList.add("hidden");
+  pending = null;
+
+  if (d?.callId) {
+    await setDoc(D("call_state", d.callId), {
+      ended: true,
+      status: "rejected",
+      endedBy: myId,
+      endedAt: Date.now()
+    }, { merge: true }).catch(() => {});
+
+    setTimeout(() => {
+      deleteDoc(D("call_state", d.callId)).catch(() => {});
+      deleteDoc(D("call_answers", d.callId)).catch(() => {});
+    }, 2500);
   }
+
+  await deleteDoc(D("active_calls", myId)).catch(() => {});
+  chat.classList.remove("hidden");
+};
+
+$("end").onclick = async () => {
+  await finishCall("ended");
 };
 $("mute").onclick = () => { const t = stream?.getAudioTracks()[0]; if (t) { t.enabled = !t.enabled; $("mute").textContent = t.enabled ? "🎙 Mute" : "🔇 Unmute"; } };
 

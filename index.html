@@ -14,7 +14,7 @@
 html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
 #app{max-width:450px;height:var(--app-height,100dvh);margin:auto;position:relative;overflow:hidden;background:#fff}
 #chat{height:100%;min-height:0}
-#messages{min-height:0}
+#messages{min-height:0;overflow-anchor:auto;scroll-padding-bottom:12px}
 #composer{flex-shrink:0;position:relative;z-index:5}
 .screen{position:absolute;inset:0}
 .hidden{display:none!important}
@@ -260,7 +260,7 @@ body{
     <video id="local" autoplay muted playsinline class="absolute top-4 right-4 w-28 h-36 object-cover rounded"></video>
     <div class="absolute top-4 w-full text-center">
       <b id="callName"></b>
-      <p id="callState">Calling…</p>
+      <p id="callState">Calling…</p><p id="callDuration" class="text-sm opacity-80 hidden">00:00</p>
     </div>
     <div class="absolute bottom-8 w-full flex justify-center gap-3 flex-wrap px-4">
       <button id="mute" class="bg-gray-700 rounded-full px-4 py-3">🎙 Mute</button>
@@ -377,7 +377,7 @@ function linkifyText(text) {
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { initializeAuth, inMemoryPersistence, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, addDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const cfg = { apiKey: "AIzaSyDHUttmxneJt1KZCf3d-9lRqrdxLxx76C0", authDomain: "myweb-88daa.firebaseapp.com", projectId: "myweb-88daa", storageBucket: "myweb-88daa.firebasestorage.app", messagingSenderId: "297038746284", appId: "1:297038746284:web:272d0ecdc8a3cfa3a20509" };
 const app = initializeApp(cfg);
@@ -579,11 +579,12 @@ function render(s) {
     }
   });
 
-  // Preserve the user's scroll position when reading older messages;
-  // on a fresh/new-message render, stay at the bottom.
+  // Keep the newest message visible. Android's keyboard changes the
+  // visual viewport, so anchor to the real bottom after the DOM is painted.
   if (wasNearBottom || box.scrollTop === 0) {
     requestAnimationFrame(() => {
       box.scrollTop = box.scrollHeight;
+      requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; });
     });
   }
 }
@@ -700,6 +701,8 @@ const rtc = {
 let unAnswer = null;
 let unCandidates = null;
 let callEnded = false;
+let callConnectedAt = 0;
+let callDurationTimer = null;
 
 function showCallError(title, e) {
   console.error(title, e);
@@ -726,7 +729,33 @@ async function playRemoteAudio() {
   }
 }
 
+function formatCallDuration(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  return h > 0
+    ? String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0") + ":" + String(sec).padStart(2,"0")
+    : String(m).padStart(2,"0") + ":" + String(sec).padStart(2,"0");
+}
+function startCallTimer(startAt) {
+  callConnectedAt = Number(startAt) || Date.now();
+  $("callDuration").classList.remove("hidden");
+  clearInterval(callDurationTimer);
+  const tick = () => $("callDuration").textContent = "Duration " + formatCallDuration(Date.now() - callConnectedAt);
+  tick();
+  callDurationTimer = setInterval(tick, 1000);
+}
+function stopCallTimer() {
+  clearInterval(callDurationTimer);
+  callDurationTimer = null;
+  callConnectedAt = 0;
+  $("callDuration").textContent = "";
+  $("callDuration").classList.add("hidden");
+}
+
 function reset() {
+  stopCallTimer();
   callEnded = true;
   cleanupCallListeners();
   try { pc?.close(); } catch {}
@@ -753,30 +782,48 @@ function peer(caller) {
     if (e.streams?.[0]) {
       $("remote").srcObject = e.streams[0];
       $("callState").textContent = "Connected";
+      if (!callConnectedAt) startCallTimer(Date.now());
       await playRemoteAudio();
     }
   };
 
   pc.onicecandidate = e => {
     if (!e.candidate || !callId) return;
-    const owner = caller ? myId : partnerId;
-    setDoc(
-      doc(collection(db, "artifacts", A, "public", "data", "call_candidates", callId, owner)),
+    // Every ICE candidate needs its own document. Reusing one owner
+    // document overwrites earlier candidates and can break audio.
+    const owner = myId;
+    addDoc(
+      collection(db, "artifacts", A, "public", "data", "call_candidates", callId, owner),
       e.candidate.toJSON()
     ).catch(console.warn);
   };
 
   pc.onconnectionstatechange = () => {
     const state = pc?.connectionState;
-    if (state === "connected") $("callState").textContent = "Connected";
-    else if (state === "connecting") $("callState").textContent = "Connecting…";
+    if (state === "connected") {
+      $("callState").textContent = "Connected";
+      if (!callConnectedAt) {
+        startCallTimer(Date.now());
+        setDoc(D("call_state", callId), { connectedAt: callConnectedAt }, { merge: true }).catch(console.warn);
+      }
+    } else if (state === "connecting") $("callState").textContent = "Connecting…";
     else if (state === "disconnected") $("callState").textContent = "Connection interrupted";
     else if (state === "failed") $("callState").textContent = "Connection failed";
     else if (state === "closed") $("callState").textContent = "Call ended";
   };
 
-  pc.oniceconnectionstatechange = () => {
-    console.log("ICE state:", pc?.iceConnectionState);
+  pc.oniceconnectionstatechange = async () => {
+    const state = pc?.iceConnectionState;
+    console.log("ICE state:", state);
+    if (state === "checking") $("callState").textContent = "Connecting…";
+    else if (state === "connected" || state === "completed") {
+      $("callState").textContent = "Connected";
+      await playRemoteAudio();
+    } else if (state === "failed") {
+      $("callState").textContent = "Connection failed — retry call";
+    } else if (state === "disconnected") {
+      $("callState").textContent = "Connection interrupted";
+    }
   };
 
   return pc;
@@ -915,6 +962,7 @@ async function start(video) {
   $("audioOnly").classList.toggle("hidden", video);
   $("callName").textContent = partnerId;
   $("callState").textContent = "Calling…";
+  stopCallTimer();
   $("speaker").textContent = "🔊 Speaker On";
   speakerOn = true;
 
@@ -981,6 +1029,7 @@ async function acceptCall() {
   $("audioOnly").classList.toggle("hidden", d.type === "video");
   $("callName").textContent = partnerId;
   $("callState").textContent = "Connecting…";
+  stopCallTimer();
   $("speaker").textContent = "🔊 Speaker On";
   speakerOn = true;
 
@@ -1004,6 +1053,10 @@ async function acceptCall() {
       D("call_answers", callId),
       { answer: { type: answer.type, sdp: answer.sdp } }
     );
+
+    const connectedAt = Date.now();
+    await setDoc(D("call_state", callId), { connectedAt }, { merge: true });
+    startCallTimer(connectedAt);
 
     watch(d.caller);
 
@@ -1073,7 +1126,11 @@ $("accept").onclick = () => acceptCall().catch(e => fail("Accept call failed", e
 $("reject").onclick = () => { incoming.classList.add("hidden"); if (pending) deleteDoc(D("active_calls", myId)); pending = null; };
 $("end").onclick = async () => {
   try {
-    if (callId) await deleteDoc(D("active_calls", partnerId)).catch(() => {});
+    if (callId) {
+      await deleteDoc(D("active_calls", partnerId)).catch(() => {});
+      await deleteDoc(D("call_state", callId)).catch(() => {});
+      await deleteDoc(D("call_answers", callId)).catch(() => {});
+    }
   } finally {
     reset();
   }
@@ -1167,15 +1224,24 @@ document.querySelectorAll("[data-bg]").forEach(b => b.onclick = () => { chat.sty
 if (localStorage.getItem("chat-bg")) chat.style.background = localStorage.getItem("chat-bg");
 
 $("clearChat").onclick = async () => {
-  if (confirm("Clear chat permanently for everyone?")) {
+  // Clear only this user's view. The other participant keeps their chat.
+  if (confirm("Clear chat sirf aapke phone se clear hoga. Continue?")) {
     try {
-      const snap = await new Promise(resolve => {
-        const unsub = onSnapshot(query(C("chat_" + room)), snapshot => {
-          unsub();
-          resolve(snapshot);
-        });
+      const snap = await new Promise((resolve, reject) => {
+        const unsub = onSnapshot(
+          query(C("chat_" + room)),
+          snapshot => { unsub(); resolve(snapshot); },
+          error => { unsub(); reject(error); }
+        );
       });
-      await Promise.all(snap.docs.map(docSnap => deleteDoc(docSnap.ref).catch(err => console.error("Delete error", err))));
+
+      await Promise.all(
+        snap.docs.map(docSnap =>
+          updateDoc(docSnap.ref, { deletedFor: arrayUnion(myId) })
+            .catch(err => console.error("Clear-for-me error", err))
+        )
+      );
+
       $("menu").classList.add("hidden");
     } catch (e) {
       fail("Clear chat failed", e);

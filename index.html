@@ -43,6 +43,9 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
 #message.reply-lock{caret-color:#0f766e}
 
 .linkified { color:#2563eb; text-decoration:underline; cursor:pointer; word-break:break-all; }
+#scrollBottom{transition:transform .2s,opacity .2s}
+#scrollBottom:active,#emojiBtn:active{transform:scale(.9)}
+#emojiTray button{cursor:pointer}
 </style>
 
 <style id="smooth-ui-upgrade">
@@ -229,9 +232,12 @@ body{
       <div class="flex items-center gap-3 relative">
         <button id="audioCall" class="p-2 text-xl">☎</button>
         <button id="videoCall" class="p-2 text-xl">▣</button>
+        <button id="scrollBottom" class="p-2 text-xl" title="Latest messages">↓</button>
         <button id="menuBtn" class="p-2 text-xl">⋮</button>
         <div id="menu" class="hidden absolute right-0 top-12 bg-white text-gray-800 w-48 z-20 shadow rounded">
-          <button id="clearChat" class="block w-full text-left p-3 border-b text-red-600 font-bold">Clear chat</button>
+          <button id="copyMyId" class="block w-full text-left p-3 border-b">Copy my ID</button>
+           <button id="copyPartnerId" class="block w-full text-left p-3 border-b">Copy partner ID</button>
+           <button id="clearChat" class="block w-full text-left p-3 border-b text-red-600 font-bold">Clear chat</button>
           <button id="themeBtn" class="block w-full text-left p-3">Chat theme</button>
           <button id="bgBtn" class="block w-full text-left p-3">Background color</button>
         </div>
@@ -245,10 +251,12 @@ body{
       </div>
       <button id="cancelReply" type="button" class="text-gray-500 font-bold px-2" aria-label="Cancel reply">✕</button>
     </div>
-    <div id="composer" class="p-2 bg-gray-100 flex items-center gap-2">
+    <div id="emojiTray" class="hidden px-3 py-2 bg-white border-t text-xl flex-wrap gap-2">😊 😂 ❤️ 👍 😍 😢 😎 🔥 🎉 🙏 👋 💯</div>
+     <div id="composer" class="p-2 bg-gray-100 flex items-center gap-2">
       <input type="file" id="mediaInput" accept="image/*,video/*" class="hidden">
       <input type="file" id="dpInput" accept="image/*" class="hidden">
-      <button id="mediaBtn" class="rounded-full bg-gray-200 text-gray-700 w-10 h-10 flex items-center justify-center text-lg font-bold">＋</button>
+      <button id="emojiBtn" class="rounded-full bg-gray-200 text-gray-700 w-10 h-10 flex items-center justify-center text-lg" title="Emoji">😊</button>
+       <button id="mediaBtn" class="rounded-full bg-gray-200 text-gray-700 w-10 h-10 flex items-center justify-center text-lg font-bold" title="Photo or video">＋</button>
       <textarea id="message" rows="1" class="flex-1 rounded-2xl p-3 border resize-none outline-none" placeholder="Message"></textarea>
       <button id="send" class="rounded-full bg-teal-700 text-white w-12 h-12 flex items-center justify-center">➤</button>
     </div>
@@ -377,7 +385,7 @@ function linkifyText(text) {
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { initializeAuth, inMemoryPersistence, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, addDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, addDoc, arrayUnion, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const cfg = { apiKey: "AIzaSyDHUttmxneJt1KZCf3d-9lRqrdxLxx76C0", authDomain: "myweb-88daa.firebaseapp.com", projectId: "myweb-88daa", storageBucket: "myweb-88daa.firebasestorage.app", messagingSenderId: "297038746284", appId: "1:297038746284:web:272d0ecdc8a3cfa3a20509" };
 const app = initializeApp(cfg);
@@ -395,6 +403,10 @@ function render(s) {
   s.forEach(x => {
     const data = x.data() || {};
     a.push({ id: x.id, ...data });
+  });
+  // Optimistic messages are shown immediately while Firestore syncs.
+  localMessages.forEach((m, id) => {
+    if (!a.some(x => x.id === id)) a.push(m);
   });
 
   // Always render every Firestore document, in chronological order.
@@ -415,7 +427,7 @@ function render(s) {
     // Only hide a message when deletedFor is a real array containing myId.
     // This prevents malformed/missing deletedFor data from hiding messages.
     const deletedFor = Array.isArray(m.deletedFor) ? m.deletedFor : [];
-    if (deletedFor.includes(myId)) return;
+    if (deletedFor.includes(myId) || localHiddenMessages.has(m.id)) return;
 
     const r = document.createElement("div");
     r.className = "flex " + (m.senderId === myId ? "justify-end" : "justify-start");
@@ -620,23 +632,34 @@ function hideReplyBubble() {
 
 async function send(imgData = null) {
   const i = $("message"), text = i.value.trim();
-  if (!text && !imgData || !uid || !room) return;
+  if ((!text && !imgData) || !uid || !room) return;
+  const now = Date.now();
   try {
     if (editing) {
       await updateDoc(doc(C("chat_" + room), editing.id), { text, isEdited: true });
       editing = null;
     } else {
-      const d = { text: text || "", senderId: myId, timestamp: Date.now(), status: "sent", deletedFor: [], isDeleted: false };
+      const id = "msg_" + now + "_" + Math.random().toString(36).slice(2, 8);
+      const d = { text: text || "", senderId: myId, timestamp: now, status: "sent", deletedFor: [], isDeleted: false };
       if (imgData) d.image = imgData;
-      if (replyTo) {
-        d.replyTo = { id: replyTo.id, text: replyTo.text || "media" };
-      }
-      await setDoc(doc(C("chat_" + room), "msg_" + Date.now() + Math.random().toString(36).slice(2, 7)), d);
+      if (replyTo) d.replyTo = { id: replyTo.id, text: replyTo.text || "media" };
+      localMessages.set(id, { id, ...d });
+      render({ docs: [] , forEach: cb => localMessages.forEach(cb) });
+      requestAnimationFrame(() => { const box = $("messages"); box.scrollTop = box.scrollHeight; });
+      i.value = "";
+      if (replyTo) hideReplyBubble();
+      requestAnimationFrame(() => i.focus({ preventScroll: true }));
+      // Fire-and-forget: UI is not blocked by Firestore round-trip.
+      setDoc(doc(C("chat_" + room), id), d).then(() => {
+        localMessages.delete(id);
+      }).catch(e => {
+        console.error("Message send failed", e);
+        const m = localMessages.get(id);
+        if (m) m.sendError = true;
+        render({ docs: [], forEach: cb => localMessages.forEach(cb) });
+        alert("Message send failed. Check your internet connection.");
+      });
     }
-    i.value = "";
-    // Sending must not dismiss the native keyboard.
-    if (replyTo) hideReplyBubble();
-    requestAnimationFrame(() => i.focus({ preventScroll: true }));
   } catch (e) { fail("Message send failed", e); }
 }
 
@@ -698,6 +721,9 @@ function listenIncoming() {
 const rtc = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" }
+    // IMPORTANT: STUN alone cannot connect every network. For reliable calls,
+    // add a TURN server (coturn, Twilio, Metered, Cloudflare Calls, etc.).
+    // { urls: "turn:YOUR_TURN_HOST:3478", username: "USERNAME", credential: "PASSWORD" }
     // Add your TURN server here when available:
     // { urls: "turn:YOUR_TURN_HOST:3478", username: "USERNAME", credential: "PASSWORD" }
   ],
@@ -708,6 +734,8 @@ let unAnswer = null;
 let unCandidates = null;
 let unCallState = null;
 let callEnded = false;
+let localHiddenMessages = new Set(JSON.parse(localStorage.getItem("hiddenMessages") || "[]"));
+let localMessages = new Map();
 let callConnectedAt = 0;
 let callDurationTimer = null;
 
@@ -824,6 +852,10 @@ function reset() {
   queued = [];
   $("remote").srcObject = null;
   $("local").srcObject = null;
+  $("mute").textContent = "🎙 Mute";
+  $("toggleVideo").textContent = "📹 Video";
+  $("speaker").textContent = "🔊 Speaker On";
+  speakerOn = true;
   incoming.classList.add("hidden");
   call.classList.add("hidden");
   chat.classList.remove("hidden");
@@ -1164,12 +1196,7 @@ async function acceptCall() {
       { answer: { type: answer.type, sdp: answer.sdp } }
     );
 
-    const connectedAt = Date.now();
-    await setDoc(D("call_state", callId), {
-      status: "connected",
-      connectedAt
-    }, { merge: true });
-    startCallTimer(connectedAt);
+    await setDoc(D("call_state", callId), { status: "answering" }, { merge: true });
     watchCallState();
 
     watch(d.caller);
@@ -1361,7 +1388,14 @@ $("speaker").onclick = async () => {
   }
 };
 
-$("toggleVideo").onclick = () => { const t = stream?.getVideoTracks()[0]; if (t) t.enabled = !t.enabled; };
+$("toggleVideo").onclick = () => { const t = stream?.getVideoTracks()[0]; if (t) { t.enabled = !t.enabled; $("toggleVideo").textContent = t.enabled ? "📹 Video On" : "🚫 Video Off"; } };
+
+function scrollToLatest(smooth=true){ const box=$("messages"); box.scrollTo({top:box.scrollHeight, behavior:smooth?"smooth":"auto"}); }
+function updateScrollButton(){ const box=$("messages"); const away=box.scrollHeight-box.scrollTop-box.clientHeight>180; $("scrollBottom").style.opacity=away?"1":".45"; }
+$("messages").addEventListener("scroll", updateScrollButton, {passive:true});
+$("scrollBottom").onclick=()=>scrollToLatest(true);
+$("emojiBtn").onclick=()=>$("emojiTray").classList.toggle("hidden");
+$("emojiTray").addEventListener("click", e=>{ const emoji=e.target.textContent.trim(); if(!emoji) return; const i=$("message"); const start=i.selectionStart ?? i.value.length, end=i.selectionEnd ?? i.value.length; i.value=i.value.slice(0,start)+emoji+i.value.slice(end); i.focus(); i.selectionStart=i.selectionEnd=start+emoji.length; });
 $("menuBtn").onclick = () => $("menu").classList.toggle("hidden");
 
 $("dpBtn").onclick = () => $("dpInput").click();
@@ -1435,30 +1469,27 @@ $("closeColors").onclick = () => $("colors").classList.add("hidden");
 document.querySelectorAll("[data-bg]").forEach(b => b.onclick = () => { chat.style.background = b.dataset.bg; localStorage.setItem("chat-bg", b.dataset.bg); $("colors").classList.add("hidden"); });
 if (localStorage.getItem("chat-bg")) chat.style.background = localStorage.getItem("chat-bg");
 
+$("copyMyId").onclick = async () => { try { await navigator.clipboard.writeText(myId); alert("Your ID copied"); } catch { alert("Your ID: " + myId); } $("menu").classList.add("hidden"); };
+$("copyPartnerId").onclick = async () => { try { await navigator.clipboard.writeText(partnerId); alert("Partner ID copied"); } catch { alert("Partner ID: " + partnerId); } $("menu").classList.add("hidden"); };
+
 $("clearChat").onclick = async () => {
-  // Clear only this user's view. The other participant keeps their chat.
-  if (confirm("Clear chat sirf aapke phone se clear hoga. Continue?")) {
-    try {
-      const snap = await new Promise((resolve, reject) => {
-        const unsub = onSnapshot(
-          query(C("chat_" + room)),
-          snapshot => { unsub(); resolve(snapshot); },
-          error => { unsub(); reject(error); }
-        );
-      });
-
-      await Promise.all(
-        snap.docs.map(docSnap =>
-          updateDoc(docSnap.ref, { deletedFor: arrayUnion(myId) })
-            .catch(err => console.error("Clear-for-me error", err))
-        )
-      );
-
-      $("menu").classList.add("hidden");
-    } catch (e) {
-      fail("Clear chat failed", e);
+  if (!confirm("Clear chat sirf aapke phone se clear hoga. Continue?")) return;
+  try {
+    const snap = await new Promise((resolve, reject) => {
+      const unsub = onSnapshot(query(C("chat_" + room)), snapshot => { unsub(); resolve(snapshot); }, error => { unsub(); reject(error); });
+    });
+    const ids = snap.docs.map(d => d.id);
+    ids.forEach(id => localHiddenMessages.add(id));
+    localStorage.setItem("hiddenMessages", JSON.stringify([...localHiddenMessages].slice(-5000)));
+    render(snap);
+    $("menu").classList.add("hidden");
+    // Persist in chunks so Firestore limits and a slow network don't freeze the UI.
+    for (let i = 0; i < snap.docs.length; i += 400) {
+      const batch = writeBatch(db);
+      snap.docs.slice(i, i + 400).forEach(d => batch.update(d.ref, { deletedFor: arrayUnion(myId) }));
+      await batch.commit();
     }
-  }
+  } catch (e) { fail("Clear chat failed", e); }
 };
 
 $("mediaBtn").onclick = () => $("mediaInput").click();

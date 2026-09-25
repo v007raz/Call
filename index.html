@@ -253,7 +253,7 @@ body{
     </div>
     <div id="emojiTray" class="hidden px-3 py-2 bg-white border-t text-xl flex-wrap gap-2">😊 😂 ❤️ 👍 😍 😢 😎 🔥 🎉 🙏 👋 💯</div>
      <div id="composer" class="p-2 bg-gray-100 flex items-center gap-2">
-      <input type="file" id="mediaInput" accept="image/*,video/*" class="hidden">
+      <input type="file" id="mediaInput" accept="image/*,video/*,audio/*" class="hidden">
       <input type="file" id="dpInput" accept="image/*" class="hidden">
       <button id="emojiBtn" class="rounded-full bg-gray-200 text-gray-700 w-10 h-10 flex items-center justify-center text-lg" title="Emoji">😊</button>
        <button id="mediaBtn" class="rounded-full bg-gray-200 text-gray-700 w-10 h-10 flex items-center justify-center text-lg font-bold" title="Photo or video">＋</button>
@@ -299,7 +299,9 @@ body{
 
   <!-- Media Full Screen Preview Modal -->
   <div id="mediaModal" class="screen hidden modal flex flex-col items-center justify-center bg-black/95 p-4 z-50">
-    <img id="previewImg" class="max-w-full max-h-[75vh] object-contain rounded mb-6" />
+    <img id="previewImg" class="max-w-full max-h-[65vh] object-contain rounded mb-6" />
+    <video id="previewVideo" controls playsinline class="hidden max-w-full max-h-[65vh] rounded mb-6"></video>
+    <audio id="previewAudio" controls class="hidden w-full max-w-xl mb-6"></audio>
     <div class="flex gap-4">
       <a id="downloadBtn" download="image.png" class="bg-teal-600 text-white px-6 py-3 rounded-full font-bold shadow">Download 📥</a>
       <button id="closeMedia" class="bg-gray-700 text-white px-6 py-3 rounded-full font-bold shadow">Close ✕</button>
@@ -386,11 +388,12 @@ function linkifyText(text) {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { initializeAuth, inMemoryPersistence, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, addDoc, arrayUnion, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 const cfg = { apiKey: "AIzaSyDHUttmxneJt1KZCf3d-9lRqrdxLxx76C0", authDomain: "myweb-88daa.firebaseapp.com", projectId: "myweb-88daa", storageBucket: "myweb-88daa.firebasestorage.app", messagingSenderId: "297038746284", appId: "1:297038746284:web:272d0ecdc8a3cfa3a20509" };
 const app = initializeApp(cfg);
 const auth = initializeAuth(app, { persistence: inMemoryPersistence });
-const db = getFirestore(app), A = "my-whatsapp-clone", $ = id => document.getElementById(id), D = (g, id) => doc(db, "artifacts", A, "public", "data", g, id), C = g => collection(db, "artifacts", A, "public", "data", g);
+const db = getFirestore(app), storage = getStorage(app), A = "my-whatsapp-clone", $ = id => document.getElementById(id), D = (g, id) => doc(db, "artifacts", A, "public", "data", g, id), C = g => collection(db, "artifacts", A, "public", "data", g);
 
 let uid = null, myId = "", partnerId = "", room = "", unChat, unPresence, unIncoming, presenceTimer, pc, stream, callId, pending, selected = null, replyTo = null, editing = null, queued = [], replyFocusLock = false, replyFocusTimer = null;
 const login = $("login"), chat = $("chat"), call = $("call"), incoming = $("incoming");
@@ -453,20 +456,42 @@ function render(s) {
           ? "You deleted this message"
           : "This message was deleted";
       b.className += " italic text-gray-400";
-    } else if (m.image) {
-      const img = document.createElement("img");
-      img.src = m.image;
-      img.className = "max-w-xs rounded mb-1 cursor-pointer";
-      img.loading = "lazy";
-      img.decoding = "async";
-      img.onclick = e => {
-        e.stopPropagation();
-        $("previewImg").src = m.image;
-        $("downloadBtn").href = m.image;
-        $("mediaModal").classList.remove("hidden");
-      };
-      b.appendChild(img);
-
+    } else if (m.mediaUrl || m.image) {
+      const mediaUrl = m.mediaUrl || m.image;
+      const mediaType = m.mediaType || (m.image ? "image/*" : "");
+      if (mediaType.startsWith("video/")) {
+        const video = document.createElement("video");
+        video.src = mediaUrl;
+        video.controls = true;
+        video.playsInline = true;
+        video.preload = "metadata";
+        video.className = "max-w-xs max-h-80 rounded mb-1";
+        b.appendChild(video);
+      } else if (mediaType.startsWith("audio/")) {
+        const audio = document.createElement("audio");
+        audio.src = mediaUrl;
+        audio.controls = true;
+        audio.preload = "metadata";
+        audio.className = "w-full max-w-xs mb-1";
+        b.appendChild(audio);
+      } else {
+        const img = document.createElement("img");
+        img.src = mediaUrl;
+        img.className = "max-w-xs rounded mb-1 cursor-pointer";
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.onclick = e => {
+          e.stopPropagation();
+          $("previewImg").src = mediaUrl;
+          $("previewImg").classList.remove("hidden");
+          $("previewVideo").classList.add("hidden");
+          $("previewAudio").classList.add("hidden");
+          $("downloadBtn").href = mediaUrl;
+          $("downloadBtn").download = m.fileName || "image";
+          $("mediaModal").classList.remove("hidden");
+        };
+        b.appendChild(img);
+      }
       if (m.text) {
         const txt = document.createElement("p");
         txt.textContent = m.text;
@@ -633,34 +658,65 @@ function hideReplyBubble() {
 async function send(imgData = null) {
   const i = $("message"), text = i.value.trim();
   if ((!text && !imgData) || !uid || !room) return;
+
+  // Clear the composer BEFORE any DOM-heavy render or Firestore work.
+  // The browser can paint the cleared box immediately instead of waiting
+  // for render() to rebuild the entire message list.
+  i.value = "";
+  if (replyTo) hideReplyBubble();
+  requestAnimationFrame(() => i.focus({ preventScroll: true }));
+
   const now = Date.now();
   try {
     if (editing) {
-      await updateDoc(doc(C("chat_" + room), editing.id), { text, isEdited: true });
+      const editId = editing.id;
       editing = null;
-    } else {
-      const id = "msg_" + now + "_" + Math.random().toString(36).slice(2, 8);
-      const d = { text: text || "", senderId: myId, timestamp: now, status: "sent", deletedFor: [], isDeleted: false };
-      if (imgData) d.image = imgData;
-      if (replyTo) d.replyTo = { id: replyTo.id, text: replyTo.text || "media" };
-      localMessages.set(id, { id, ...d });
-      render({ docs: [] , forEach: cb => localMessages.forEach(cb) });
-      requestAnimationFrame(() => { const box = $("messages"); box.scrollTop = box.scrollHeight; });
-      i.value = "";
-      if (replyTo) hideReplyBubble();
-      requestAnimationFrame(() => i.focus({ preventScroll: true }));
-      // Fire-and-forget: UI is not blocked by Firestore round-trip.
-      setDoc(doc(C("chat_" + room), id), d).then(() => {
-        localMessages.delete(id);
-      }).catch(e => {
-        console.error("Message send failed", e);
-        const m = localMessages.get(id);
-        if (m) m.sendError = true;
-        render({ docs: [], forEach: cb => localMessages.forEach(cb) });
-        alert("Message send failed. Check your internet connection.");
-      });
+
+      // Keep the UI responsive while the edit is saved.
+      updateDoc(doc(C("chat_" + room), editId), { text, isEdited: true })
+        .catch(e => {
+          console.error("Message edit failed", e);
+          alert("Message edit failed. Check your internet connection.");
+        });
+      return;
     }
-  } catch (e) { fail("Message send failed", e); }
+
+    const id = "msg_" + now + "_" + Math.random().toString(36).slice(2, 8);
+    const d = {
+      text: text || "",
+      senderId: myId,
+      timestamp: now,
+      status: "sent",
+      deletedFor: [],
+      isDeleted: false
+    };
+    if (imgData) d.image = imgData;
+    if (replyTo) d.replyTo = { id: replyTo.id, text: replyTo.text || "media" };
+
+    localMessages.set(id, { id, ...d });
+
+    // Let the cleared textarea paint first, then update the message list.
+    requestAnimationFrame(() => {
+      render({ docs: [], forEach: cb => localMessages.forEach(cb) });
+      requestAnimationFrame(() => {
+        const box = $("messages");
+        box.scrollTop = box.scrollHeight;
+      });
+    });
+
+    // Fire-and-forget: UI is not blocked by Firestore round-trip.
+    setDoc(doc(C("chat_" + room), id), d).then(() => {
+      localMessages.delete(id);
+    }).catch(e => {
+      console.error("Message send failed", e);
+      const m = localMessages.get(id);
+      if (m) m.sendError = true;
+      render({ docs: [], forEach: cb => localMessages.forEach(cb) });
+      alert("Message send failed. Check your internet connection.");
+    });
+  } catch (e) {
+    fail("Message send failed", e);
+  }
 }
 
 function presence() {
@@ -1493,15 +1549,62 @@ $("clearChat").onclick = async () => {
 };
 
 $("mediaBtn").onclick = () => $("mediaInput").click();
-$("mediaInput").onchange = e => {
+$("mediaInput").onchange = async e => {
   const file = e.target.files[0];
+  e.target.value = "";
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = event => send(event.target.result);
-  reader.readAsDataURL(file);
+
+  const allowed = file.type.startsWith("image/") || file.type.startsWith("video/") || file.type.startsWith("audio/");
+  if (!allowed) return alert("Please select an image, video, or audio file.");
+  if (file.size > 50 * 1024 * 1024) return alert("Media file must be 50 MB or smaller.");
+
+  try {
+    if (!uid || !room) throw new Error("Chat is not connected yet.");
+
+    const id = "media_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    const ext = (file.name.split(".").pop() || "bin").replace(/[^a-z0-9]/gi, "").slice(0, 8) || "bin";
+    const ref = storageRef(storage, "chat_media/" + room + "/" + id + "." + ext);
+
+    await uploadBytes(ref, file, { contentType: file.type });
+    const url = await getDownloadURL(ref);
+    await sendMediaMessage({ id, url, type: file.type, name: file.name, size: file.size });
+  } catch (err) {
+    console.error("Media upload failed:", err);
+    alert("Media upload failed: " + (err?.message || "Check Firebase Storage rules and your internet connection."));
+  }
 };
 
-$("closeMedia").onclick = () => $("mediaModal").classList.add("hidden");
+async function sendMediaMessage({ id, url, type, name, size }) {
+  const d = {
+    text: "", senderId: myId, timestamp: Date.now(), status: "sent",
+    deletedFor: [], isDeleted: false,
+    mediaUrl: url, mediaType: type, fileName: name, fileSize: size
+  };
+  if (replyTo) {
+    d.replyTo = { id: replyTo.id, text: replyTo.text || "media" };
+    hideReplyBubble();
+  }
+  localMessages.set(id, { id, ...d });
+  render({ docs: [], forEach: cb => localMessages.forEach(cb) });
+  requestAnimationFrame(() => {
+    const box = $("messages"); box.scrollTop = box.scrollHeight;
+  });
+  setDoc(doc(C("chat_" + room), id), d).then(() => {
+    localMessages.delete(id);
+  }).catch(e => {
+    console.error("Media message save failed:", e);
+    alert("Media uploaded, but the message could not be saved.");
+  });
+}
+
+$("closeMedia").onclick = () => {
+  $("previewVideo").pause();
+  $("previewAudio").pause();
+  $("previewImg").classList.remove("hidden");
+  $("previewVideo").classList.add("hidden");
+  $("previewAudio").classList.add("hidden");
+  $("mediaModal").classList.add("hidden");
+};
 $("cancelReply").onclick = () => { hideReplyBubble(); };
 $("closeActions").onclick = () => $("actions").classList.add("hidden");
 

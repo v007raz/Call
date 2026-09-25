@@ -94,7 +94,6 @@ body{
 }
 #connect:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(15,118,110,.28)}
 #connect:active{transform:scale(.98)}
-#connect:disabled{opacity:.65;cursor:not-allowed;transform:none!important;box-shadow:none!important}
 #connect:after{
   content:"";position:absolute;inset:-80% -20%;
   background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.28) 50%,transparent 65%);
@@ -233,7 +232,7 @@ body{
       <div class="flex items-center gap-3 relative">
         <button id="audioCall" class="p-2 text-xl">☎</button>
         <button id="videoCall" class="p-2 text-xl">▣</button>
-        <button id="scrollBottom" class="p-2 text-xl" title="Latest messages">↓</button>
+        <button id="scrollBottom" class="p-2 text-xl relative" title="Latest messages">↓<span id="unreadBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] leading-none rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">0</span></button>
         <button id="menuBtn" class="p-2 text-xl">⋮</button>
         <div id="menu" class="hidden absolute right-0 top-12 bg-white text-gray-800 w-48 z-20 shadow rounded">
           <button id="copyMyId" class="block w-full text-left p-3 border-b">Copy my ID</button>
@@ -289,12 +288,24 @@ body{
 
   <div id="actions" class="screen hidden modal flex items-center justify-center">
     <div class="bg-white rounded w-64 overflow-hidden shadow-lg">
+      <button id="react" class="w-full text-left p-4 border-b hover:bg-gray-50">😊 React</button>
       <button id="reply" class="w-full text-left p-4 border-b hover:bg-gray-50">↩ Reply</button>
       <button id="copy" class="w-full text-left p-4 border-b hover:bg-gray-50">📋 Copy</button>
       <button id="edit" class="w-full text-left p-4 border-b hover:bg-gray-50">✎ Edit</button>
       <button id="deleteMe" class="w-full text-left p-4 border-b hover:bg-gray-50">Delete for me</button>
       <button id="deleteAll" class="w-full text-left p-4 border-b text-red-600 hover:bg-gray-50 hidden">Delete for everyone</button>
       <button id="closeActions" class="w-full p-4 hover:bg-gray-50 text-gray-600">Cancel</button>
+    </div>
+  </div>
+
+  <div id="reactionPicker" class="screen hidden modal flex items-center justify-center">
+    <div class="bg-white rounded-full px-3 py-2 flex gap-2 shadow-lg text-2xl">
+      <button data-emoji="❤️" class="react-emoji p-1">❤️</button>
+      <button data-emoji="👍" class="react-emoji p-1">👍</button>
+      <button data-emoji="😂" class="react-emoji p-1">😂</button>
+      <button data-emoji="😮" class="react-emoji p-1">😮</button>
+      <button data-emoji="😢" class="react-emoji p-1">😢</button>
+      <button data-emoji="🙏" class="react-emoji p-1">🙏</button>
     </div>
   </div>
 
@@ -388,68 +399,19 @@ function linkifyText(text) {
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { initializeAuth, inMemoryPersistence, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentSingleTabManager, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, addDoc, arrayUnion, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, addDoc, arrayUnion, writeBatch, deleteField } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
 const cfg = { apiKey: "AIzaSyDHUttmxneJt1KZCf3d-9lRqrdxLxx76C0", authDomain: "myweb-88daa.firebaseapp.com", projectId: "myweb-88daa", storageBucket: "myweb-88daa.firebasestorage.app", messagingSenderId: "297038746284", appId: "1:297038746284:web:272d0ecdc8a3cfa3a20509" };
 const app = initializeApp(cfg);
 const auth = initializeAuth(app, { persistence: inMemoryPersistence });
-let db;
-try {
-  db = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-      tabManager: persistentSingleTabManager()
-    })
-  });
-} catch (_) {
-  db = getFirestore(app);
-}
-const storage = getStorage(app), A = "my-whatsapp-clone",
-  $ = id => document.getElementById(id),
-  D = (g, id) => doc(db, "artifacts", A, "public", "data", g, id),
-  C = g => collection(db, "artifacts", A, "public", "data", g);
+const db = getFirestore(app), storage = getStorage(app), A = "my-whatsapp-clone", $ = id => document.getElementById(id), D = (g, id) => doc(db, "artifacts", A, "public", "data", g, id), C = g => collection(db, "artifacts", A, "public", "data", g);
 
 let uid = null, myId = "", partnerId = "", room = "", unChat, unPresence, unIncoming, presenceTimer, pc, stream, callId, pending, selected = null, replyTo = null, editing = null, queued = [], replyFocusLock = false, replyFocusTimer = null;
 const login = $("login"), chat = $("chat"), call = $("call"), incoming = $("incoming");
 
 function fail(t, e) { console.error(t, e); $("loginStatus").textContent = t + " — " + (e?.code || e?.message || "failed"); }
 function valid(x) { return /^[a-z0-9_-]{2,40}$/.test(x); }
-
-function chatCacheKey() {
-  return "chat_cache_v2_" + room;
-}
-
-function renderCachedMessages() {
-  if (!room) return;
-  try {
-    const cached = JSON.parse(localStorage.getItem(chatCacheKey()) || "[]");
-    if (!Array.isArray(cached) || !cached.length) return;
-
-    render({
-      forEach(cb) {
-        cached.forEach(m => cb({
-          id: m.id,
-          data: () => m
-        }));
-      }
-    });
-  } catch (e) {
-    console.warn("Local chat cache read failed:", e);
-  }
-}
-
-function saveChatCache(messages) {
-  if (!room) return;
-  try {
-    // Keep the cache small; Firestore remains the source of truth.
-    localStorage.setItem(
-      chatCacheKey(),
-      JSON.stringify(messages.filter(m => !m.pendingMedia && !m.uploadError).slice(-200))
-    );
-  } catch (e) {
-    console.warn("Local chat cache write failed:", e);
-  }
-}
 
 function render(s) {
   const a = [];
@@ -470,11 +432,19 @@ function render(s) {
     return tx - ty;
   });
 
-  saveChatCache(a);
-
   const box = $("messages");
   const wasNearBottom =
     box.scrollHeight - box.scrollTop - box.clientHeight < 120;
+
+  // Count newly-arrived partner messages the user hasn't scrolled to yet.
+  a.forEach(m => {
+    if (m.senderId === myId || m.isDeleted || seenMessageIds.has(m.id)) return;
+    seenMessageIds.add(m.id);
+    if (renderedOnce && !wasNearBottom) unreadCount++;
+  });
+  if (wasNearBottom) unreadCount = 0;
+  renderedOnce = true;
+  updateUnreadBadge();
 
   box.innerHTML = "";
 
@@ -497,18 +467,9 @@ function render(s) {
     if (m.replyTo) {
       const rep = document.createElement("div");
       rep.className =
-        "bg-black/10 border-l-4 border-teal-700 px-2 py-1 mb-1 text-xs rounded text-gray-700 overflow-hidden";
-
-      const repWho = document.createElement("div");
-      repWho.className = "font-bold text-teal-700 truncate";
-      repWho.textContent =
-        m.replyTo.senderId === myId ? "You" : (m.replyTo.senderId || partnerId || "Reply");
-
-      const repText = document.createElement("div");
-      repText.className = "truncate";
-      repText.textContent = m.replyTo.text || "media";
-
-      rep.append(repWho, repText);
+        "reply-preview bg-black/5 border-l-4 border-teal-700 p-1.5 mb-1.5 text-xs rounded-md text-gray-700";
+      rep.textContent = m.replyTo.text || "media";
+      rep.title = "Reply to message";
       b.appendChild(rep);
     }
 
@@ -518,126 +479,42 @@ function render(s) {
           ? "You deleted this message"
           : "This message was deleted";
       b.className += " italic text-gray-400";
-    } else if (m.pendingMedia || m.uploadError || m.mediaUrl || m.image) {
-      const mediaUrl = m.pendingMedia ? m.localPreviewUrl : (m.mediaUrl || m.image);
+    } else if (m.mediaUrl || m.image) {
+      const mediaUrl = m.mediaUrl || m.image;
       const mediaType = m.mediaType || (m.image ? "image/*" : "");
-
-      // Local preview is shown immediately while the file uploads.
-      // If upload failed before a preview could be rendered, show a visible
-      // placeholder instead of making the message disappear.
-      if (m.uploadError && !mediaUrl) {
-        const failedPreview = document.createElement("div");
-        failedPreview.className = "w-56 rounded-lg bg-black/10 p-4 text-center";
-        failedPreview.textContent =
-          mediaType.startsWith("video/") ? "🎥 Video" :
-          mediaType.startsWith("audio/") ? "🎵 Audio" : "🖼️ Image";
-        b.appendChild(failedPreview);
-      } else if (mediaType.startsWith("video/")) {
+      if (mediaType.startsWith("video/")) {
         const video = document.createElement("video");
-        video.src = mediaUrl || "";
-        video.controls = !m.pendingMedia;
+        video.src = mediaUrl;
+        video.controls = true;
         video.playsInline = true;
         video.preload = "metadata";
         video.className = "max-w-xs max-h-80 rounded mb-1";
-        if (m.pendingMedia) video.muted = true;
-        if (!m.pendingMedia) {
-          video.onclick = e => {
-            e.stopPropagation();
-            $("previewVideo").src = mediaUrl;
-            $("previewVideo").classList.remove("hidden");
-            $("previewImg").classList.add("hidden");
-            $("previewAudio").classList.add("hidden");
-            $("downloadBtn").href = mediaUrl;
-            $("downloadBtn").download = m.fileName || "video";
-            $("mediaModal").classList.remove("hidden");
-          };
-        }
         b.appendChild(video);
       } else if (mediaType.startsWith("audio/")) {
         const audio = document.createElement("audio");
-        audio.src = mediaUrl || "";
-        audio.controls = !m.pendingMedia;
+        audio.src = mediaUrl;
+        audio.controls = true;
         audio.preload = "metadata";
         audio.className = "w-full max-w-xs mb-1";
-        if (!m.pendingMedia) {
-          audio.onclick = e => {
-            e.stopPropagation();
-            $("previewAudio").src = mediaUrl;
-            $("previewAudio").classList.remove("hidden");
-            $("previewImg").classList.add("hidden");
-            $("previewVideo").classList.add("hidden");
-            $("downloadBtn").href = mediaUrl;
-            $("downloadBtn").download = m.fileName || "audio";
-            $("mediaModal").classList.remove("hidden");
-          };
-        }
         b.appendChild(audio);
       } else {
         const img = document.createElement("img");
-        img.src = mediaUrl || "";
+        img.src = mediaUrl;
         img.className = "max-w-xs rounded mb-1 cursor-pointer";
         img.loading = "lazy";
         img.decoding = "async";
-        if (!m.pendingMedia) {
-          img.onclick = e => {
-            e.stopPropagation();
-            $("previewImg").src = mediaUrl;
-            $("previewImg").classList.remove("hidden");
-            $("previewVideo").classList.add("hidden");
-            $("previewAudio").classList.add("hidden");
-            $("downloadBtn").href = mediaUrl;
-            $("downloadBtn").download = m.fileName || "image";
-            $("mediaModal").classList.remove("hidden");
-          };
-        }
+        img.onclick = e => {
+          e.stopPropagation();
+          $("previewImg").src = mediaUrl;
+          $("previewImg").classList.remove("hidden");
+          $("previewVideo").classList.add("hidden");
+          $("previewAudio").classList.add("hidden");
+          $("downloadBtn").href = mediaUrl;
+          $("downloadBtn").download = m.fileName || "image";
+          $("mediaModal").classList.remove("hidden");
+        };
         b.appendChild(img);
       }
-
-      // Upload status appears inside the same bubble.
-      if (m.pendingMedia || m.uploadError) {
-        const status = document.createElement("div");
-        status.className = "mt-1 rounded-lg bg-black/10 px-2 py-1 text-xs";
-
-        const statusLine = document.createElement("div");
-        statusLine.className = "flex items-center justify-between gap-2";
-
-        const statusText = document.createElement("span");
-        statusText.textContent = m.uploadError
-          ? "❌ Upload failed"
-          : m.uploadProgress >= 100
-          ? "⏳ Saving message…"
-          : `⬆️ Uploading ${Math.round(m.uploadProgress || 0)}%`;
-
-        const sizeText = document.createElement("span");
-        sizeText.className = "opacity-70";
-        sizeText.textContent = m.fileName
-          ? m.fileName
-          : (m.fileSize ? `${(m.fileSize / (1024 * 1024)).toFixed(1)} MB` : "");
-
-        statusLine.append(statusText, sizeText);
-        status.appendChild(statusLine);
-
-        const track = document.createElement("div");
-        track.className = "h-1.5 rounded-full bg-black/10 mt-1 overflow-hidden";
-
-        const fill = document.createElement("div");
-        fill.className = "h-full rounded-full transition-all";
-        fill.style.width = `${Math.max(0, Math.min(100, Number(m.uploadProgress) || 0))}%`;
-        track.appendChild(fill);
-        status.appendChild(track);
-
-        if (m.uploadError) {
-          const err = document.createElement("div");
-          err.className = "mt-1 break-words";
-          err.textContent =
-            m.uploadError +
-            " — Firebase Storage rules/bucket or network may be blocking the upload.";
-          status.appendChild(err);
-        }
-
-        b.appendChild(status);
-      }
-
       if (m.text) {
         const txt = document.createElement("p");
         txt.textContent = m.text;
@@ -681,6 +558,30 @@ function render(s) {
       else b.append(f);
     }
 
+    if (m.reactions && Object.keys(m.reactions).length && !m.isDeleted) {
+      const groups = {};
+      for (const uid_ in m.reactions) {
+        const em = m.reactions[uid_];
+        (groups[em] = groups[em] || []).push(uid_);
+      }
+      const row = document.createElement("div");
+      row.className = "absolute -bottom-3 right-2 flex gap-1";
+      Object.entries(groups).forEach(([em, uids]) => {
+        const pill = document.createElement("button");
+        pill.type = "button";
+        pill.className =
+          "bg-white border rounded-full px-1.5 text-[11px] shadow flex items-center gap-0.5" +
+          (uids.includes(myId) ? " border-teal-600" : " border-gray-200");
+        pill.textContent = em + (uids.length > 1 ? " " + uids.length : "");
+        pill.onclick = e => {
+          e.stopPropagation();
+          toggleReaction(m, em);
+        };
+        row.appendChild(pill);
+      });
+      b.appendChild(row);
+    }
+
     let sx = 0, sy = 0;
     b.ontouchstart = e => {
       if (!e.touches[0]) return;
@@ -719,7 +620,7 @@ function render(s) {
     };
 
     b.addEventListener("pointerdown", e => {
-      if (e.target.closest("a, img")) return;
+      if (e.target.closest("a, img, button")) return;
       longPressTriggered = false;
       pressStartX = e.clientX; pressStartY = e.clientY;
       cancelLongPress();
@@ -742,7 +643,7 @@ function render(s) {
     b.addEventListener("contextmenu", e => { e.preventDefault(); e.stopPropagation(); });
 
     b.onclick = e => {
-      if (e.target.closest("a, img")) return;
+      if (e.target.closest("a, img, button")) return;
       if (b.dataset.swipeReply === "1" || longPressTriggered) {
         longPressTriggered = false;
         return;
@@ -792,6 +693,15 @@ function showReplyBubble(message) {
   focusReplyInput();
 }
 
+function toggleReaction(m, emoji) {
+  if (!room || !myId) return;
+  const current = m.reactions?.[myId];
+  const value = current === emoji ? deleteField() : emoji;
+  updateDoc(doc(C("chat_" + room), m.id), { ["reactions." + myId]: value }).catch(e => {
+    console.error("Reaction failed", e);
+  });
+}
+
 function hideReplyBubble() {
   replyFocusLock = false;
   clearTimeout(replyFocusTimer);
@@ -805,18 +715,14 @@ async function send(imgData = null) {
   const i = $("message"), text = i.value.trim();
   if ((!text && !imgData) || !uid || !room) return;
 
-  // IMPORTANT: save the selected reply BEFORE hiding the reply composer.
-  // hideReplyBubble() clears replyTo, so reading replyTo afterwards would
-  // make the sent message lose its quoted/reply preview.
-  const activeReply = replyTo ? {
-    id: replyTo.id,
-    text: replyTo.text || "media",
-    senderId: replyTo.senderId || ""
-  } : null;
+  // Capture the reply BEFORE clearing replyTo. Otherwise hideReplyBubble()
+  // removes replyTo and the sent message loses its quoted/reply reference.
+  const reply = replyTo ? { id: replyTo.id, text: replyTo.text || "media" } : null;
 
-  // Clear the composer BEFORE any DOM-heavy render or Firestore work.
+  // Clear the composer immediately so sending never leaves the typed text
+  // stuck in the input while Firestore is saving.
   i.value = "";
-  if (replyTo) hideReplyBubble();
+  if (reply) hideReplyBubble();
   requestAnimationFrame(() => i.focus({ preventScroll: true }));
 
   const now = Date.now();
@@ -844,11 +750,8 @@ async function send(imgData = null) {
       isDeleted: false
     };
     if (imgData) d.image = imgData;
-
-    // Persist the reply reference inside the message itself.
-    // This is what makes the reply bubble remain visible after sending
-    // and after Firestore reloads the chat.
-    if (activeReply) d.replyTo = activeReply;
+    // Keep the quoted message INSIDE the sent bubble permanently.
+    if (reply) d.replyTo = reply;
 
     localMessages.set(id, { id, ...d });
 
@@ -882,9 +785,32 @@ function presence() {
   presenceTimer = setInterval(write, 5000);
   unPresence = onSnapshot(D("presence", partnerId), s => {
     const d = s.data();
-    $("status").textContent = d && d.online && Date.now() - d.lastSeen < 15000 ? "Online" : "Offline";
+    const isTyping = d && d.typing && Date.now() - Number(d.typingAt || 0) < 3000;
+    $("status").textContent = isTyping
+      ? "typing…"
+      : d && d.online && Date.now() - d.lastSeen < 15000
+      ? "Online"
+      : "Offline";
   });
 }
+
+let typingClearTimer = null;
+let typingIsOn = false;
+function setTyping(isTyping) {
+  if (isTyping === typingIsOn) {
+    // Still typing: refresh typingAt so the partner's 3s window doesn't expire.
+    if (isTyping) setDoc(D("presence", myId), { typing: true, typingAt: Date.now() }, { merge: true }).catch(() => {});
+    return;
+  }
+  typingIsOn = isTyping;
+  setDoc(D("presence", myId), { typing: isTyping, typingAt: Date.now() }, { merge: true }).catch(() => {});
+}
+$("message").addEventListener("input", () => {
+  if (!uid || !room) return;
+  setTyping(true);
+  clearTimeout(typingClearTimer);
+  typingClearTimer = setTimeout(() => setTyping(false), 1800);
+});
 
 function setup() {
   myId = $("myId").value.trim().toLowerCase();
@@ -893,20 +819,8 @@ function setup() {
   localStorage.setItem("whatsapp_my_id", myId);
   room = [myId, partnerId].sort().join("_");
   $("partnerName").textContent = partnerId;
-
-  if (!uid) {
-    alert("Firebase abhi connect ho raha hai. 1–2 second wait karke try karein.");
-    return;
-  }
-
   login.classList.add("hidden");
   chat.classList.remove("hidden");
-
-  // Show the last known messages immediately instead of waiting for the
-  // Firestore first snapshot/network round-trip.
-  renderCachedMessages();
-
-  unChat?.();
   unChat = onSnapshot(
     query(C("chat_" + room)),
     snap => {
@@ -961,6 +875,18 @@ let unCallState = null;
 let callEnded = false;
 let localHiddenMessages = new Set(JSON.parse(localStorage.getItem("hiddenMessages") || "[]"));
 let localMessages = new Map();
+let seenMessageIds = new Set();
+let unreadCount = 0;
+let renderedOnce = false;
+function updateUnreadBadge() {
+  const badge = $("unreadBadge");
+  if (unreadCount > 0) {
+    badge.textContent = unreadCount > 99 ? "99+" : String(unreadCount);
+    badge.classList.remove("hidden");
+  } else {
+    badge.classList.add("hidden");
+  }
+}
 let callConnectedAt = 0;
 let callDurationTimer = null;
 
@@ -1616,9 +1542,9 @@ $("speaker").onclick = async () => {
 $("toggleVideo").onclick = () => { const t = stream?.getVideoTracks()[0]; if (t) { t.enabled = !t.enabled; $("toggleVideo").textContent = t.enabled ? "📹 Video On" : "🚫 Video Off"; } };
 
 function scrollToLatest(smooth=true){ const box=$("messages"); box.scrollTo({top:box.scrollHeight, behavior:smooth?"smooth":"auto"}); }
-function updateScrollButton(){ const box=$("messages"); const away=box.scrollHeight-box.scrollTop-box.clientHeight>180; $("scrollBottom").style.opacity=away?"1":".45"; }
+function updateScrollButton(){ const box=$("messages"); const away=box.scrollHeight-box.scrollTop-box.clientHeight>180; $("scrollBottom").style.opacity=away?"1":".45"; if(!away){ unreadCount=0; updateUnreadBadge(); } }
 $("messages").addEventListener("scroll", updateScrollButton, {passive:true});
-$("scrollBottom").onclick=()=>scrollToLatest(true);
+$("scrollBottom").onclick=()=>{ unreadCount=0; updateUnreadBadge(); scrollToLatest(true); };
 $("emojiBtn").onclick=()=>$("emojiTray").classList.toggle("hidden");
 $("emojiTray").addEventListener("click", e=>{ const emoji=e.target.textContent.trim(); if(!emoji) return; const i=$("message"); const start=i.selectionStart ?? i.value.length, end=i.selectionEnd ?? i.value.length; i.value=i.value.slice(0,start)+emoji+i.value.slice(end); i.focus(); i.selectionStart=i.selectionEnd=start+emoji.length; });
 $("menuBtn").onclick = () => $("menu").classList.toggle("hidden");
@@ -1718,217 +1644,52 @@ $("clearChat").onclick = async () => {
 };
 
 $("mediaBtn").onclick = () => $("mediaInput").click();
-
 $("mediaInput").onchange = async e => {
   const file = e.target.files[0];
   e.target.value = "";
   if (!file) return;
 
-  const allowed =
-    file.type.startsWith("image/") ||
-    file.type.startsWith("video/") ||
-    file.type.startsWith("audio/");
-
-  if (!allowed) {
-    alert("Please select an image, video, or audio file.");
-    return;
-  }
-
-  if (file.size > 50 * 1024 * 1024) {
-    alert("Media file must be 50 MB or smaller.");
-    return;
-  }
-
-  if (!uid || !room) {
-    alert("Chat is not connected yet.");
-    return;
-  }
-
-  const id = "media_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
-  const ext =
-    (file.name.split(".").pop() || "bin")
-      .replace(/[^a-z0-9]/gi, "")
-      .slice(0, 8) || "bin";
-
-  const ref = storageRef(
-    storage,
-    "chat_media/" + room + "/" + id + "." + ext
-  );
-
-  // Keep the reply reference before any UI cleanup.
-  const activeReply = replyTo ? {
-    id: replyTo.id,
-    text: replyTo.text || "media",
-    senderId: replyTo.senderId || ""
-  } : null;
-
-  if (replyTo) hideReplyBubble();
-
-  // Immediate local preview: user can see the video/file before upload finishes.
-  const localPreviewUrl = URL.createObjectURL(file);
-  const pendingMessage = {
-    id,
-    text: "",
-    senderId: myId,
-    timestamp: Date.now(),
-    status: "sending",
-    deletedFor: [],
-    isDeleted: false,
-    pendingMedia: true,
-    localPreviewUrl,
-    mediaType: file.type,
-    fileName: file.name,
-    fileSize: file.size,
-    uploadProgress: 0
-  };
-
-  if (activeReply) pendingMessage.replyTo = activeReply;
-
-  localMessages.set(id, pendingMessage);
-  render({ docs: [], forEach: cb => localMessages.forEach(cb) });
-  console.log("Media upload started:", {
-    name: file.name,
-    type: file.type,
-    size: file.size
-  });
-  requestAnimationFrame(() => {
-    const box = $("messages");
-    box.scrollTop = box.scrollHeight;
-  });
+  const allowed = file.type.startsWith("image/") || file.type.startsWith("video/") || file.type.startsWith("audio/");
+  if (!allowed) return alert("Please select an image, video, or audio file.");
+  if (file.size > 50 * 1024 * 1024) return alert("Media file must be 50 MB or smaller.");
 
   try {
-    const uploadTask = uploadBytesResumable(ref, file, {
-      contentType: file.type
-    });
+    if (!uid || !room) throw new Error("Chat is not connected yet.");
 
-    await new Promise((resolve, reject) => {
-      uploadTask.on(
-        "state_changed",
-        snapshot => {
-          const progress = snapshot.totalBytes
-            ? (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-            : 0;
+    const id = "media_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    const ext = (file.name.split(".").pop() || "bin").replace(/[^a-z0-9]/gi, "").slice(0, 8) || "bin";
+    const ref = storageRef(storage, "chat_media/" + room + "/" + id + "." + ext);
 
-          const m = localMessages.get(id);
-          if (m) {
-            m.uploadProgress = progress;
-            m.status = "uploading";
-            render({
-              docs: [],
-              forEach: cb => localMessages.forEach(cb)
-            });
-          }
-        },
-        reject,
-        resolve
-      );
-    });
-
-    const url = await getDownloadURL(uploadTask.snapshot.ref);
-
-    const m = localMessages.get(id);
-    if (m) {
-      m.uploadProgress = 100;
-      m.status = "saving";
-      m.localPreviewUrl = "";
-      render({
-        docs: [],
-        forEach: cb => localMessages.forEach(cb)
-      });
-    }
-
-    await sendMediaMessage({
-      id,
-      url,
-      type: file.type,
-      name: file.name,
-      size: file.size,
-      reply: activeReply
-    });
-
-    URL.revokeObjectURL(localPreviewUrl);
+    await uploadBytes(ref, file, { contentType: file.type });
+    const url = await getDownloadURL(ref);
+    await sendMediaMessage({ id, url, type: file.type, name: file.name, size: file.size });
   } catch (err) {
     console.error("Media upload failed:", err);
-
-    const m = localMessages.get(id);
-    if (m) {
-      m.pendingMedia = false;
-      m.uploadError =
-        err?.message ||
-        "Upload failed. Check internet connection and Firebase Storage rules.";
-      m.status = "failed";
-      render({
-        docs: [],
-        forEach: cb => localMessages.forEach(cb)
-      });
-    } else {
-      alert(
-        "Media upload failed: " +
-        (err?.message || "Check internet connection and Firebase Storage rules.")
-      );
-    }
+    alert("Media upload failed: " + (err?.message || "Check Firebase Storage rules and your internet connection."));
   }
 };
 
-async function sendMediaMessage({ id, url, type, name, size, reply = null }) {
+async function sendMediaMessage({ id, url, type, name, size }) {
   const d = {
-    text: "",
-    senderId: myId,
-    timestamp: Date.now(),
-    status: "sent",
-    deletedFor: [],
-    isDeleted: false,
-    mediaUrl: url,
-    mediaType: type,
-    fileName: name,
-    fileSize: size
+    text: "", senderId: myId, timestamp: Date.now(), status: "sent",
+    deletedFor: [], isDeleted: false,
+    mediaUrl: url, mediaType: type, fileName: name, fileSize: size
   };
-
-  if (reply) d.replyTo = reply;
-
-  const existing = localMessages.get(id);
-  localMessages.set(id, {
-    ...(existing || {}),
-    id,
-    ...d,
-    pendingMedia: false,
-    uploadProgress: 100,
-    uploadError: ""
-  });
-
-  render({
-    docs: [],
-    forEach: cb => localMessages.forEach(cb)
-  });
-
-  requestAnimationFrame(() => {
-    const box = $("messages");
-    box.scrollTop = box.scrollHeight;
-  });
-
-  try {
-    await setDoc(doc(C("chat_" + room), id), d);
-    localMessages.delete(id);
-    render({
-      docs: [],
-      forEach: cb => localMessages.forEach(cb)
-    });
-  } catch (e) {
-    console.error("Media message save failed:", e);
-
-    const m = localMessages.get(id);
-    if (m) {
-      m.pendingMedia = false;
-      m.status = "failed";
-      m.uploadError =
-        "File uploaded, but chat message save failed: " +
-        (e?.message || "Firestore error");
-      render({
-        docs: [],
-        forEach: cb => localMessages.forEach(cb)
-      });
-    }
+  if (replyTo) {
+    d.replyTo = { id: replyTo.id, text: replyTo.text || "media" };
+    hideReplyBubble();
   }
+  localMessages.set(id, { id, ...d });
+  render({ docs: [], forEach: cb => localMessages.forEach(cb) });
+  requestAnimationFrame(() => {
+    const box = $("messages"); box.scrollTop = box.scrollHeight;
+  });
+  setDoc(doc(C("chat_" + room), id), d).then(() => {
+    localMessages.delete(id);
+  }).catch(e => {
+    console.error("Media message save failed:", e);
+    alert("Media uploaded, but the message could not be saved.");
+  });
 }
 
 $("closeMedia").onclick = () => {
@@ -1946,6 +1707,21 @@ $("reply").onclick = () => {
   if (selected) showReplyBubble(selected);
   $("actions").classList.add("hidden");
 };
+
+$("react").onclick = () => {
+  $("actions").classList.add("hidden");
+  if (selected) $("reactionPicker").classList.remove("hidden");
+};
+$("reactionPicker").onclick = e => {
+  // Clicking the dimmed backdrop (not an emoji button) closes the picker.
+  if (e.target === e.currentTarget) $("reactionPicker").classList.add("hidden");
+};
+document.querySelectorAll(".react-emoji").forEach(btn => {
+  btn.onclick = () => {
+    if (selected) toggleReaction(selected, btn.dataset.emoji);
+    $("reactionPicker").classList.add("hidden");
+  };
+});
 
 $("copy").onclick = async () => {
   if (!selected) return;
@@ -2033,21 +1809,13 @@ window.addEventListener("resize", syncAppToVisualViewport, { passive: true });
 window.visualViewport?.addEventListener("resize", syncAppToVisualViewport, { passive: true });
 window.visualViewport?.addEventListener("scroll", syncAppToVisualViewport, { passive: true });
 
-$("connect").disabled = true;
-
 signInAnonymously(auth).catch(e => fail("Firebase auth failed", e));
-
 onAuthStateChanged(auth, u => {
   uid = u?.uid || null;
-
   if (uid) {
     clearTimeout(timer);
-    $("connect").disabled = false;
     $("connect").textContent = "Start Secure Chat";
     $("loginStatus").textContent = "✅ Connected";
-  } else {
-    $("connect").disabled = true;
-    $("connect").textContent = "Connecting to Firebase…";
   }
 });
 </script>

@@ -52,8 +52,10 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
 :root{
   --accent:#0f766e;
   --accent-2:#14b8a6;
+  --accent-3:#2dd4bf;
   --glass:rgba(255,255,255,.78);
   --ease:cubic-bezier(.22,1,.36,1);
+  --ease-bounce:cubic-bezier(.34,1.56,.64,1);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -67,17 +69,37 @@ body{
   box-shadow:0 24px 80px rgba(15,23,42,.18);
   isolation:isolate;
 }
+
+/* ---------- Screen transitions ---------- */
+.screen{animation:screenIn .38s var(--ease) both}
+@keyframes screenIn{from{opacity:0}to{opacity:1}}
+
+/* ---------- Login ---------- */
 #login{
   background:
     radial-gradient(circle at 20% 15%,rgba(20,184,166,.16),transparent 32%),
     radial-gradient(circle at 80% 85%,rgba(59,130,246,.12),transparent 34%),
     linear-gradient(145deg,#ffffff,#f0fdfa);
+  overflow:hidden;
 }
+#login:before,#login:after{
+  content:"";position:absolute;border-radius:50%;filter:blur(1px);
+  background:radial-gradient(circle,rgba(20,184,166,.35),transparent 70%);
+  animation:orbFloat 9s ease-in-out infinite;pointer-events:none;z-index:0;
+}
+#login:before{width:220px;height:220px;top:-60px;left:-60px}
+#login:after{width:260px;height:260px;bottom:-80px;right:-70px;animation-delay:-4s;
+  background:radial-gradient(circle,rgba(59,130,246,.28),transparent 70%);}
+#login > *{position:relative;z-index:1}
 #login h1{
   letter-spacing:-.04em;
   background:linear-gradient(120deg,#0f766e,#0ea5a4,#2563eb);
   -webkit-background-clip:text;background-clip:text;color:transparent;
   animation:logoFloat 4s ease-in-out infinite;
+}
+#login h1:before{
+  content:"🔒";display:block;font-size:34px;-webkit-text-fill-color:initial;margin-bottom:6px;
+  animation:lockPop .5s var(--ease-bounce) both;
 }
 #login input,#message{
   transition:transform .22s var(--ease),box-shadow .22s var(--ease),border-color .22s var(--ease);
@@ -100,23 +122,54 @@ body{
   transform:translateX(-70%) rotate(12deg);
   animation:shine 3.2s infinite;
 }
+#connect:disabled{opacity:.75;cursor:progress}
+#connect.is-loading:before{
+  content:"";width:16px;height:16px;margin-right:8px;display:inline-block;vertical-align:-3px;
+  border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;
+  animation:spin .7s linear infinite;
+}
+#loginStatus{transition:color .25s,opacity .25s}
+
+/* ---------- Header ---------- */
 #chatHeader{
   background:linear-gradient(115deg,#075e54,#0f766e 55%,#0d9488)!important;
+  background-size:200% 200%;
+  animation:headerSheen 12s ease-in-out infinite;
   box-shadow:0 3px 18px rgba(0,0,0,.16);
   z-index:10;
 }
 #dpBtn{
   transition:transform .25s var(--ease),box-shadow .25s var(--ease);
+  position:relative;
 }
 #dpBtn:hover{transform:scale(1.06);box-shadow:0 0 0 4px rgba(255,255,255,.12)}
-#status{opacity:.85;transition:opacity .25s}
+#statusDot{
+  width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;
+  background:#9ca3af;box-shadow:0 0 0 rgba(74,222,128,.6);flex-shrink:0;
+  transition:background .3s;
+}
+#statusDot.online{background:#4ade80;animation:pulseDot 1.8s ease-out infinite}
+#statusDot.typing{background:#facc15;animation:pulseDot 1s ease-out infinite}
+#status{opacity:.9;transition:opacity .25s;display:inline-flex;align-items:center}
+
+/* ---------- Messages area ---------- */
 #messages{
   background-image:
     radial-gradient(rgba(15,118,110,.045) 1px,transparent 1px);
   background-size:18px 18px;
   overscroll-behavior:contain;
   scrollbar-width:thin;
+  scrollbar-color:rgba(15,118,110,.35) transparent;
 }
+#messages::-webkit-scrollbar{width:6px}
+#messages::-webkit-scrollbar-thumb{background:rgba(15,118,110,.28);border-radius:99px}
+
+.date-sep{
+  align-self:center;background:rgba(15,23,42,.55);color:#fff;font-size:11px;
+  padding:4px 12px;border-radius:99px;margin:6px 0;box-shadow:0 2px 8px rgba(0,0,0,.12);
+  animation:popIn .3s var(--ease) both;backdrop-filter:blur(4px);
+}
+
 .bubble{
   position:relative;
   border:1px solid rgba(0,0,0,.045);
@@ -132,6 +185,11 @@ body{
 .received{
   background:rgba(255,255,255,.94);
   border-bottom-left-radius:4px;
+}
+.bubble.heart-pop:after{
+  content:"❤️";position:absolute;left:50%;top:50%;font-size:28px;
+  transform:translate(-50%,-50%) scale(0);pointer-events:none;
+  animation:heartPop .7s var(--ease-bounce) forwards;
 }
 .bubble img{
   max-width:min(280px,72vw)!important;
@@ -154,14 +212,17 @@ body{
   -webkit-backdrop-filter:blur(16px);
   padding-bottom:max(8px,env(safe-area-inset-bottom))!important;
 }
-#mediaBtn,#send{
+#mediaBtn,#send,#emojiBtn{
   transition:transform .2s var(--ease),box-shadow .2s var(--ease),background .2s;
 }
-#mediaBtn:hover,#send:hover{transform:translateY(-2px);box-shadow:0 7px 18px rgba(15,118,110,.20)}
-#mediaBtn:active,#send:active{transform:scale(.92)}
+#mediaBtn:hover,#send:hover,#emojiBtn:hover{transform:translateY(-2px);box-shadow:0 7px 18px rgba(15,118,110,.20)}
+#mediaBtn:active,#send:active,#emojiBtn:active{transform:scale(.92)}
 #send{
   background:linear-gradient(135deg,#0f766e,#14b8a6)!important;
 }
+#send.sending{animation:sendPop .35s var(--ease)}
+#unreadBadge{animation:badgePop .3s var(--ease-bounce) both}
+
 #menu,.modal>div{
   animation:popIn .25s var(--ease);
   box-shadow:0 18px 55px rgba(15,23,42,.20)!important;
@@ -184,6 +245,8 @@ body{
 #downloadBtn:hover,#closeMedia:hover,#accept:hover,#reject:hover,#end:hover,#mute:hover,#speaker:hover,#toggleVideo:hover{
   transform:translateY(-2px);filter:brightness(1.06);box-shadow:0 8px 22px rgba(0,0,0,.22);
 }
+
+/* ---------- Call screen ---------- */
 #call{
   background:radial-gradient(circle at 50% 30%,#1f2937,#020617 75%)!important;
 }
@@ -192,15 +255,62 @@ body{
   box-shadow:0 10px 30px rgba(0,0,0,.35);
   animation:localFloat 4s ease-in-out infinite;
 }
+#incoming{
+  background:radial-gradient(circle at 50% 30%,rgba(31,41,55,.97),rgba(2,6,23,.97) 75%)!important;
+}
 #incoming h2{animation:pulseSoft 1.8s ease-in-out infinite}
+#accept{box-shadow:0 0 0 rgba(34,197,94,.55);animation:acceptGlow 1.8s ease-out infinite}
+#reject,#end{position:relative}
+
+/* Call/incoming avatar with radar-style pulse rings */
+#callAvatar,#callerAvatar{box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.call-ring{animation:callRing 2.6s ease-out infinite;opacity:0}
+#callAvatarWrap.connected .call-ring{animation:none;opacity:0}
+#local{transition:all .3s var(--ease)}
+#call.swapped #remote{
+  position:absolute!important;top:16px;right:16px;width:112px;height:144px;
+  object-fit:cover;border-radius:10px;z-index:6;
+  border:2px solid rgba(255,255,255,.7);box-shadow:0 10px 30px rgba(0,0,0,.35);
+}
+#call.swapped #local{
+  position:absolute!important;inset:0;top:0;right:0;width:100%!important;height:100%!important;
+  border:none;border-radius:0;box-shadow:none;z-index:1;animation:none;
+}
+#call.swapped #audioOnly{display:none}
+
+/* Toggled state (muted / video off / earpiece) on call controls */
+#mute.active,#toggleVideo.active,#speaker.active{
+  background:linear-gradient(135deg,#dc2626,#ef4444)!important;
+  box-shadow:0 0 0 4px rgba(239,68,68,.22);
+}
+
+/* ---------- Ripple ---------- */
+.rui-ripple{
+  position:absolute;border-radius:50%;background:rgba(255,255,255,.55);
+  transform:scale(0);pointer-events:none;animation:rippleAnim .55s ease-out forwards;
+  mix-blend-mode:overlay;
+}
+
 @keyframes logoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes lockPop{from{opacity:0;transform:scale(.4) rotate(-15deg)}to{opacity:1;transform:scale(1) rotate(0)}}
+@keyframes orbFloat{0%,100%{transform:translate(0,0)}50%{transform:translate(14px,-10px)}}
+@keyframes headerSheen{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
 @keyframes shine{0%,55%{transform:translateX(-75%) rotate(12deg)}75%,100%{transform:translateX(75%) rotate(12deg)}}
+@keyframes spin{to{transform:rotate(360deg)}}
 @keyframes messageIn{from{opacity:0;transform:translateY(9px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes heartPop{0%{opacity:0;transform:translate(-50%,-50%) scale(0)}30%{opacity:1;transform:translate(-50%,-50%) scale(1.3)}100%{opacity:0;transform:translate(-50%,-140%) scale(1)}}
 @keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes popIn{from{opacity:0;transform:translateY(-7px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes sendPop{0%{transform:scale(1)}40%{transform:scale(.82)}100%{transform:scale(1)}}
+@keyframes badgePop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
 @keyframes mediaIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
 @keyframes localFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
 @keyframes pulseSoft{0%,100%{opacity:.7}50%{opacity:1}}
+@keyframes pulseDot{0%{box-shadow:0 0 0 0 rgba(74,222,128,.55)}100%{box-shadow:0 0 0 8px rgba(74,222,128,0)}}
+@keyframes ringRing{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+@keyframes callRing{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.85);opacity:0}}
+@keyframes acceptGlow{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}100%{box-shadow:0 0 0 14px rgba(34,197,94,0)}}
+@keyframes rippleAnim{to{transform:scale(2.6);opacity:0}}
 @media (prefers-reduced-motion:reduce){
   *,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}
 }
@@ -213,7 +323,7 @@ body{
     <h1 class="text-2xl font-bold text-center mb-6">Secure Cloud</h1>
     <input id="myId" class="border rounded p-3 mb-3" placeholder="Your ID (e.g. Nobita)">
     <input id="partnerId" class="border rounded p-3 mb-3" placeholder="Partner ID (e.g. Doraemon)">
-    <button id="connect" class="bg-teal-700 text-white rounded p-3 font-bold">Connecting to Firebase…</button>
+    <button id="connect" class="bg-teal-700 text-white rounded p-3 font-bold is-loading">Connecting to Firebase…</button>
     <p id="loginStatus" class="text-center text-sm mt-4 text-gray-500">Initializing Firebase…</p>
   </section>
 
@@ -226,7 +336,7 @@ body{
         </button>
         <div class="min-w-0">
           <b id="partnerName" class="block truncate">Partner</b>
-          <small id="status" class="block">Offline</small>
+          <small id="status" class="block"><span id="statusDot"></span><span id="statusText">Offline</span></small>
         </div>
       </div>
       <div class="flex items-center gap-3 relative">
@@ -264,8 +374,18 @@ body{
 
   <section id="call" class="screen hidden bg-gray-900 text-white">
     <video id="remote" autoplay playsinline class="w-full h-full object-cover"></video>
-    <div id="audioOnly" class="absolute inset-0 flex items-center justify-center text-7xl">☎</div>
-    <video id="local" autoplay muted playsinline class="absolute top-4 right-4 w-28 h-36 object-cover rounded"></video>
+    <div id="audioOnly" class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6">
+      <div id="callAvatarWrap" class="relative w-28 h-28 flex items-center justify-center">
+        <span class="call-ring absolute inset-0 rounded-full border-2 border-teal-300/50"></span>
+        <span class="call-ring absolute inset-0 rounded-full border-2 border-teal-300/50" style="animation-delay:.7s"></span>
+        <span class="call-ring absolute inset-0 rounded-full border-2 border-teal-300/50" style="animation-delay:1.4s"></span>
+        <div id="callAvatar" class="w-28 h-28 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-5xl overflow-hidden relative z-10">
+          <img id="callAvatarImg" class="w-full h-full object-cover hidden" alt="">
+          <span id="callAvatarInitial">👤</span>
+        </div>
+      </div>
+    </div>
+    <video id="local" autoplay muted playsinline title="Tap to swap view" class="absolute top-4 right-4 w-28 h-36 object-cover rounded cursor-pointer"></video>
     <div class="absolute top-4 w-full text-center">
       <b id="callName"></b>
       <p id="callState">Calling…</p><p id="callDuration" class="text-sm opacity-80 hidden">00:00</p>
@@ -278,8 +398,17 @@ body{
     </div>
   </section>
 
-  <div id="incoming" class="screen hidden bg-gray-900/95 text-white flex flex-col justify-center items-center">
-    <h2 id="caller" class="text-2xl mb-8"></h2>
+  <div id="incoming" class="screen hidden bg-gray-900/95 text-white flex flex-col justify-center items-center gap-5">
+    <div id="callerAvatarWrap" class="relative w-24 h-24 flex items-center justify-center">
+      <span class="call-ring absolute inset-0 rounded-full border-2 border-teal-300/50"></span>
+      <span class="call-ring absolute inset-0 rounded-full border-2 border-teal-300/50" style="animation-delay:.7s"></span>
+      <span class="call-ring absolute inset-0 rounded-full border-2 border-teal-300/50" style="animation-delay:1.4s"></span>
+      <div id="callerAvatar" class="w-24 h-24 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-4xl overflow-hidden relative z-10">
+        <img id="callerAvatarImg" class="w-full h-full object-cover hidden" alt="">
+        <span id="callerAvatarInitial">👤</span>
+      </div>
+    </div>
+    <h2 id="caller" class="text-2xl"></h2>
     <div class="flex gap-8">
       <button id="reject" class="bg-red-600 rounded-full px-6 py-3">Reject</button>
       <button id="accept" class="bg-green-600 rounded-full px-6 py-3">Accept</button>
@@ -440,19 +569,40 @@ function render(s) {
   a.forEach(m => {
     if (m.senderId === myId || m.isDeleted || seenMessageIds.has(m.id)) return;
     seenMessageIds.add(m.id);
-    if (renderedOnce && !wasNearBottom) unreadCount++;
+    if (renderedOnce) {
+      if (!wasNearBottom) unreadCount++;
+      playNotifySound();
+    }
   });
   if (wasNearBottom) unreadCount = 0;
   renderedOnce = true;
   updateUnreadBadge();
 
   box.innerHTML = "";
+  let lastDateKey = "";
 
   a.forEach(m => {
     // Only hide a message when deletedFor is a real array containing myId.
     // This prevents malformed/missing deletedFor data from hiding messages.
     const deletedFor = Array.isArray(m.deletedFor) ? m.deletedFor : [];
     if (deletedFor.includes(myId) || localHiddenMessages.has(m.id)) return;
+
+    const msgTime = Number(m.timestamp);
+    if (Number.isFinite(msgTime) && msgTime > 0) {
+      const d = new Date(msgTime);
+      const dateKey = d.toDateString();
+      if (dateKey !== lastDateKey) {
+        lastDateKey = dateKey;
+        const today = new Date().toDateString();
+        const yest = new Date(Date.now() - 86400000).toDateString();
+        const label = dateKey === today ? "Today" : dateKey === yest ? "Yesterday" :
+          d.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+        const sep = document.createElement("div");
+        sep.className = "date-sep";
+        sep.textContent = label;
+        box.append(sep);
+      }
+    }
 
     const r = document.createElement("div");
     r.className = "flex " + (m.senderId === myId ? "justify-end" : "justify-start");
@@ -581,6 +731,8 @@ function render(s) {
       });
       b.appendChild(row);
     }
+
+    attachHeartDoubleTap(b, m);
 
     let sx = 0, sy = 0;
     b.ontouchstart = e => {
@@ -779,19 +931,54 @@ async function send(imgData = null) {
   }
 }
 
+// Formats a raw lastSeen timestamp into an exact, human-readable line
+// like WhatsApp's "last seen today at 6:42 PM" instead of a bare "Offline".
+function formatLastSeen(ts) {
+  const t = Number(ts);
+  if (!t || !Number.isFinite(t) || t <= 0) return "Offline";
+
+  const now = Date.now();
+  const diffSec = Math.floor((now - t) / 1000);
+  if (diffSec < 45) return "last seen just now";
+
+  const d = new Date(t);
+  const timeStr = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  const today = new Date().toDateString();
+  const yesterday = new Date(now - 86400000).toDateString();
+
+  if (d.toDateString() === today) return "last seen today at " + timeStr;
+  if (d.toDateString() === yesterday) return "last seen yesterday at " + timeStr;
+
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  const dateStr = d.toLocaleDateString("en-US", sameYear
+    ? { day: "numeric", month: "short" }
+    : { day: "numeric", month: "short", year: "numeric" });
+  return "last seen on " + dateStr + " at " + timeStr;
+}
+
+let lastPartnerPresence = null;
+let lastSeenRefreshTimer = null;
+function renderPresence() {
+  const d = lastPartnerPresence;
+  const isTyping = d && d.typing && Date.now() - Number(d.typingAt || 0) < 3000;
+  const isOnline = d && d.online && Date.now() - Number(d.lastSeen || 0) < 15000;
+  $("statusText").textContent = isTyping ? "typing…" : isOnline ? "Online" : formatLastSeen(d && d.lastSeen);
+  $("statusDot").className = isTyping ? "typing" : isOnline ? "online" : "";
+}
+
 function presence() {
   const write = () => setDoc(D("presence", myId), { online: true, lastSeen: Date.now(), uid }, { merge: true }).catch(console.warn);
   write();
   presenceTimer = setInterval(write, 5000);
   unPresence = onSnapshot(D("presence", partnerId), s => {
-    const d = s.data();
-    const isTyping = d && d.typing && Date.now() - Number(d.typingAt || 0) < 3000;
-    $("status").textContent = isTyping
-      ? "typing…"
-      : d && d.online && Date.now() - d.lastSeen < 15000
-      ? "Online"
-      : "Offline";
+    lastPartnerPresence = s.data() || null;
+    renderPresence();
   });
+  // Re-render every 20s so a static timestamp still counts up naturally
+  // (e.g. "just now" turning into "last seen today at 6:42 PM") without
+  // needing a new Firestore update from the partner.
+  clearInterval(lastSeenRefreshTimer);
+  lastSeenRefreshTimer = setInterval(renderPresence, 20000);
 }
 
 let typingClearTimer = null;
@@ -843,10 +1030,13 @@ function listenIncoming() {
     if (d && d.caller && Date.now() - Number(d.timestamp || 0) < 30000) {
       pending = d;
       $("caller").textContent = d.caller + (d.type === "video" ? " is video calling" : " is calling");
+      setCallAvatar($("callerAvatarImg"), $("callerAvatarInitial"), d.caller);
+      if (incoming.classList.contains("hidden")) startRing("in");
       incoming.classList.remove("hidden");
     } else {
       // Caller cancelled / call timed out: return immediately to inbox.
       pending = null;
+      stopRing();
       incoming.classList.add("hidden");
       if (call.classList.contains("hidden")) chat.classList.remove("hidden");
     }
@@ -890,6 +1080,111 @@ function updateUnreadBadge() {
 let callConnectedAt = 0;
 let callDurationTimer = null;
 
+// --- Soft notification sound for incoming messages (WebAudio, no assets needed) ---
+let notifyAudioCtx = null;
+function playNotifySound() {
+  try {
+    notifyAudioCtx = notifyAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (notifyAudioCtx.state === "suspended") notifyAudioCtx.resume().catch(() => {});
+    const t0 = notifyAudioCtx.currentTime;
+    [880, 1180].forEach((freq, i) => {
+      const osc = notifyAudioCtx.createOscillator();
+      const gain = notifyAudioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, t0 + i * 0.09);
+      gain.gain.linearRampToValueAtTime(0.14, t0 + i * 0.09 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + i * 0.09 + 0.24);
+      osc.connect(gain).connect(notifyAudioCtx.destination);
+      osc.start(t0 + i * 0.09);
+      osc.stop(t0 + i * 0.09 + 0.26);
+    });
+  } catch (e) { /* audio not available; ignore silently */ }
+}
+
+// --- Ringtone (incoming) / ringback (outgoing) tone with optional vibration ---
+let ringCtx = null;
+let ringTimer = null;
+function playRingChime(kind) {
+  try {
+    ringCtx = ringCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (ringCtx.state === "suspended") ringCtx.resume().catch(() => {});
+    const t0 = ringCtx.currentTime;
+    const freqs = kind === "back" ? [440, 494] : [523.25, 659.25];
+    freqs.forEach((freq, i) => {
+      const osc = ringCtx.createOscillator();
+      const gain = ringCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const start = t0 + i * 0.25;
+      const peak = kind === "back" ? 0.10 : 0.16;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(peak, start + 0.05);
+      gain.gain.setValueAtTime(peak, start + 0.4);
+      gain.gain.linearRampToValueAtTime(0, start + 0.5);
+      osc.connect(gain).connect(ringCtx.destination);
+      osc.start(start);
+      osc.stop(start + 0.55);
+    });
+    if (kind === "in" && navigator.vibrate) { try { navigator.vibrate([450, 250]); } catch {} }
+  } catch (e) { /* audio not available; ignore silently */ }
+}
+function startRing(kind) {
+  stopRing();
+  playRingChime(kind);
+  ringTimer = setInterval(() => playRingChime(kind), kind === "back" ? 2600 : 2000);
+}
+function stopRing() {
+  clearInterval(ringTimer);
+  ringTimer = null;
+  if (navigator.vibrate) { try { navigator.vibrate(0); } catch {} }
+}
+
+// --- Show partner's saved display photo (if any) or their initial in call avatars ---
+function setCallAvatar(imgEl, initialEl, name) {
+  const dp = localStorage.getItem("chat-dp");
+  if (dp) {
+    imgEl.src = dp;
+    imgEl.classList.remove("hidden");
+    initialEl.classList.add("hidden");
+  } else {
+    imgEl.classList.add("hidden");
+    initialEl.classList.remove("hidden");
+    initialEl.textContent = (name || "").trim().charAt(0).toUpperCase() || "👤";
+  }
+}
+
+// --- Subtle ripple feedback on tappable controls ---
+document.addEventListener("pointerdown", e => {
+  const el = e.target.closest("button");
+  if (!el || el.disabled) return;
+  const rect = el.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height);
+  const ripple = document.createElement("span");
+  ripple.className = "rui-ripple";
+  ripple.style.width = ripple.style.height = size + "px";
+  ripple.style.left = (e.clientX - rect.left - size / 2) + "px";
+  ripple.style.top = (e.clientY - rect.top - size / 2) + "px";
+  const prevPosition = getComputedStyle(el).position;
+  if (prevPosition === "static") el.style.position = "relative";
+  el.style.overflow = el.style.overflow || "hidden";
+  el.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 550);
+}, { passive: true });
+
+// --- Double-tap a message bubble for a quick ❤️ reaction ---
+function attachHeartDoubleTap(bubbleEl, message) {
+  bubbleEl.addEventListener("dblclick", e => {
+    if (e.target.closest("a, img, button") || message.isDeleted) return;
+    e.preventDefault();
+    toggleReaction(message, "❤️");
+    bubbleEl.classList.remove("heart-pop");
+    void bubbleEl.offsetWidth; // restart animation if double-tapped again quickly
+    bubbleEl.classList.add("heart-pop");
+    setTimeout(() => bubbleEl.classList.remove("heart-pop"), 700);
+  });
+}
+
 function showCallError(title, e) {
   console.error(title, e);
   $("callState").textContent = title;
@@ -923,6 +1218,8 @@ function watchCallState() {
 
     if (d.connectedAt && !callConnectedAt) {
       startCallTimer(d.connectedAt);
+      stopRing();
+      $("callAvatarWrap").classList.add("connected");
     }
   }, e => console.warn("Call state listener error:", e));
 }
@@ -993,6 +1290,7 @@ function stopCallTimer() {
 function reset() {
   releaseCallWakeLock();
   stopCallTimer();
+  stopRing();
   callEnded = true;
   cleanupCallListeners();
   try { pc?.close(); } catch {}
@@ -1004,8 +1302,14 @@ function reset() {
   $("remote").srcObject = null;
   $("local").srcObject = null;
   $("mute").textContent = "🎙 Mute";
+  $("mute").classList.remove("active");
   $("toggleVideo").textContent = "📹 Video";
+  $("toggleVideo").classList.remove("active");
   $("speaker").textContent = "🔊 Speaker On";
+  $("speaker").classList.remove("active");
+  $("callAvatarWrap").classList.remove("connected");
+  call.classList.remove("swapped");
+  localIsSwapped = false;
   speakerOn = true;
   incoming.classList.add("hidden");
   call.classList.add("hidden");
@@ -1058,6 +1362,8 @@ function peer(caller) {
     const state = pc?.connectionState;
     if (state === "connected") {
       $("callState").textContent = "Connected";
+      stopRing();
+      $("callAvatarWrap").classList.add("connected");
       if (!callConnectedAt) {
         startCallTimer(Date.now());
         setDoc(D("call_state", callId), { connectedAt: callConnectedAt }, { merge: true }).catch(console.warn);
@@ -1074,6 +1380,8 @@ function peer(caller) {
     if (state === "checking") $("callState").textContent = "Connecting…";
     else if (state === "connected" || state === "completed") {
       $("callState").textContent = "Connected";
+      stopRing();
+      $("callAvatarWrap").classList.add("connected");
       await playRemoteAudio();
     } else if (state === "failed") {
       $("callState").textContent = "Connection failed — retry call";
@@ -1234,6 +1542,10 @@ async function start(video) {
   stopCallTimer();
   $("speaker").textContent = "🔊 Speaker On";
   speakerOn = true;
+  setCallAvatar($("callAvatarImg"), $("callAvatarInitial"), partnerId);
+  $("callAvatarWrap").classList.remove("connected");
+  call.classList.remove("swapped");
+  startRing("back");
 
   chat.classList.add("hidden");
   call.classList.remove("hidden");
@@ -1325,6 +1637,10 @@ async function acceptCall() {
   stopCallTimer();
   $("speaker").textContent = "🔊 Speaker On";
   speakerOn = true;
+  setCallAvatar($("callAvatarImg"), $("callAvatarInitial"), partnerId);
+  $("callAvatarWrap").classList.remove("connected");
+  call.classList.remove("swapped");
+  stopRing();
 
   incoming.classList.add("hidden");
   chat.classList.add("hidden");
@@ -1370,6 +1686,9 @@ $("send").addEventListener("pointerdown", e => {
 });
 $("send").onclick = () => {
   $("message").focus({ preventScroll: true });
+  $("send").classList.remove("sending");
+  void $("send").offsetWidth;
+  $("send").classList.add("sending");
   send().finally(() => $("message").focus({ preventScroll: true }));
 };
 $("message").onkeydown = e => { 
@@ -1501,6 +1820,7 @@ $("accept").onclick = async () => {
 };
 $("reject").onclick = async () => {
   const d = pending;
+  stopRing();
   incoming.classList.add("hidden");
   pending = null;
 
@@ -1525,7 +1845,7 @@ $("reject").onclick = async () => {
 $("end").onclick = async () => {
   await finishCall("ended");
 };
-$("mute").onclick = () => { const t = stream?.getAudioTracks()[0]; if (t) { t.enabled = !t.enabled; $("mute").textContent = t.enabled ? "🎙 Mute" : "🔇 Unmute"; } };
+$("mute").onclick = () => { const t = stream?.getAudioTracks()[0]; if (t) { t.enabled = !t.enabled; $("mute").textContent = t.enabled ? "🎙 Mute" : "🔇 Unmute"; $("mute").classList.toggle("active", !t.enabled); } };
 
 let speakerOn = true;
 $("speaker").onclick = async () => {
@@ -1534,12 +1854,21 @@ $("speaker").onclick = async () => {
   remoteVideo.muted = !speakerOn;
   remoteVideo.volume = speakerOn ? 1 : 0;
   $("speaker").textContent = speakerOn ? "🔊 Speaker On" : "🔈 Earpiece";
+  $("speaker").classList.toggle("active", !speakerOn);
   if (speakerOn) {
     try { await remoteVideo.play(); } catch (e) { console.warn(e); }
   }
 };
 
-$("toggleVideo").onclick = () => { const t = stream?.getVideoTracks()[0]; if (t) { t.enabled = !t.enabled; $("toggleVideo").textContent = t.enabled ? "📹 Video On" : "🚫 Video Off"; } };
+$("toggleVideo").onclick = () => { const t = stream?.getVideoTracks()[0]; if (t) { t.enabled = !t.enabled; $("toggleVideo").textContent = t.enabled ? "📹 Video On" : "🚫 Video Off"; $("toggleVideo").classList.toggle("active", !t.enabled); } };
+
+// Tap your own video preview during a video call to swap it to full screen.
+let localIsSwapped = false;
+$("local").addEventListener("click", () => {
+  if ($("local").classList.contains("hidden")) return; // audio-only call, nothing to swap
+  localIsSwapped = !localIsSwapped;
+  call.classList.toggle("swapped", localIsSwapped);
+});
 
 function scrollToLatest(smooth=true){ const box=$("messages"); box.scrollTo({top:box.scrollHeight, behavior:smooth?"smooth":"auto"}); }
 function updateScrollButton(){ const box=$("messages"); const away=box.scrollHeight-box.scrollTop-box.clientHeight>180; $("scrollBottom").style.opacity=away?"1":".45"; if(!away){ unreadCount=0; updateUnreadBadge(); } }
@@ -1814,6 +2143,7 @@ onAuthStateChanged(auth, u => {
   uid = u?.uid || null;
   if (uid) {
     clearTimeout(timer);
+    $("connect").classList.remove("is-loading");
     $("connect").textContent = "Start Secure Chat";
     $("loginStatus").textContent = "✅ Connected";
   }

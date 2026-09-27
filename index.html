@@ -212,13 +212,22 @@ body{
   -webkit-backdrop-filter:blur(16px);
   padding-bottom:max(8px,env(safe-area-inset-bottom))!important;
 }
-#mediaBtn,#send,#emojiBtn{
-  transition:transform .2s var(--ease),box-shadow .2s var(--ease),background .2s;
+#send,#emojiBtn{
+  transition:transform .2s var(--ease),box-shadow .2s var(--ease),background .2s,opacity .2s;
 }
-#mediaBtn:hover,#send:hover,#emojiBtn:hover{transform:translateY(-2px);box-shadow:0 7px 18px rgba(15,118,110,.20)}
-#mediaBtn:active,#send:active,#emojiBtn:active{transform:scale(.92)}
+#send:hover,#emojiBtn:hover{transform:translateY(-2px);box-shadow:0 7px 18px rgba(15,118,110,.20)}
+#send:active,#emojiBtn:active{transform:scale(.92)}
 #send{
-  background:linear-gradient(135deg,#0f766e,#14b8a6)!important;
+  width:46px;height:46px;flex-shrink:0;color:#fff;
+  background:linear-gradient(135deg,#0f766e,#14b8a6);
+  box-shadow:0 4px 14px rgba(15,118,110,.35),inset 0 1px 0 rgba(255,255,255,.25);
+  border:none;
+}
+#send svg{transform:translateX(-1px);filter:drop-shadow(0 1px 1px rgba(0,0,0,.12))}
+#send:hover{box-shadow:0 8px 22px rgba(15,118,110,.4),inset 0 1px 0 rgba(255,255,255,.3)}
+#send:disabled{
+  background:linear-gradient(135deg,#9ca3af,#cbd5e1);
+  box-shadow:none;opacity:.65;transform:none;cursor:default;
 }
 #send.sending{animation:sendPop .35s var(--ease)}
 #unreadBadge{animation:badgePop .3s var(--ease-bounce) both}
@@ -314,10 +323,56 @@ body{
 @media (prefers-reduced-motion:reduce){
   *,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}
 }
+
+/* ---------- Lite mode ----------
+   Some browsers (in-app WebViews, older/lighter mobile browsers) render
+   backdrop-filter blur and constant background/gradient animations far
+   slower than Chrome/Safari do on the very same phone. A short on-device
+   frame-rate probe (see the script below) measures the *actual* rendering
+   speed of whichever browser opened the page and adds html.lite when it's
+   struggling, so the app quietly trims exactly the expensive parts instead
+   of everyone getting a one-size-fits-all, always-heavy or always-plain UI. */
+html.lite,html.lite *,html.lite *:before,html.lite *:after{
+  animation-duration:.01ms!important;animation-iteration-count:1!important;
+  scroll-behavior:auto!important;transition-duration:.01ms!important;
+}
+html.lite #composer,html.lite #replyBox,html.lite .modal,html.lite .date-sep{
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+}
+html.lite #messages{background-image:none!important}
+html.lite #login:before,html.lite #login:after{display:none!important}
+html.lite .bubble,html.lite #app{box-shadow:none!important}
 </style>
 
 </head>
 <body>
+<script>
+// Runs before anything else. Measures real, on-device frame rate for
+// ~700ms while the login screen's blur/gradient animations are already
+// playing, so it reflects THIS browser's actual rendering speed rather
+// than guessing from device specs (which don't explain why the same
+// phone can feel fast in one browser and sluggish in another).
+(function () {
+  try {
+    if (typeof requestAnimationFrame !== "function") return;
+    var frames = 0, start = null;
+    function tick(now) {
+      if (start === null) start = now;
+      frames++;
+      if (now - start < 700) {
+        requestAnimationFrame(tick);
+      } else {
+        var fps = frames / ((now - start) / 1000);
+        if (fps < 45) {
+          document.documentElement.classList.add("lite");
+          console.info("Lite rendering mode on (~" + Math.round(fps) + " fps measured)");
+        }
+      }
+    }
+    requestAnimationFrame(tick);
+  } catch (e) { /* never block the app over a perf probe */ }
+})();
+</script>
 <div id="app">
   <section id="login" class="screen flex flex-col justify-center p-6">
     <h1 class="text-2xl font-bold text-center mb-6">Secure Cloud</h1>
@@ -363,12 +418,14 @@ body{
     </div>
     <div id="emojiTray" class="hidden px-3 py-2 bg-white border-t text-xl flex-wrap gap-2">😊 😂 ❤️ 👍 😍 😢 😎 🔥 🎉 🙏 👋 💯</div>
      <div id="composer" class="p-2 bg-gray-100 flex items-center gap-2">
-      <input type="file" id="mediaInput" accept="image/*,video/*,audio/*" class="hidden">
       <input type="file" id="dpInput" accept="image/*" class="hidden">
       <button id="emojiBtn" class="rounded-full bg-gray-200 text-gray-700 w-10 h-10 flex items-center justify-center text-lg" title="Emoji">😊</button>
-       <button id="mediaBtn" class="rounded-full bg-gray-200 text-gray-700 w-10 h-10 flex items-center justify-center text-lg font-bold" title="Photo or video">＋</button>
       <textarea id="message" rows="1" class="flex-1 rounded-2xl p-3 border resize-none outline-none" placeholder="Message"></textarea>
-      <button id="send" class="rounded-full bg-teal-700 text-white w-12 h-12 flex items-center justify-center">➤</button>
+      <button id="send" class="rounded-full flex items-center justify-center" title="Send" aria-label="Send message">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3.4 20.6 21 12 3.4 3.4 3 10l12 2-12 2 .4 6.6Z" fill="currentColor" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+        </svg>
+      </button>
     </div>
   </section>
 
@@ -528,15 +585,26 @@ function linkifyText(text) {
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { initializeAuth, inMemoryPersistence, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, addDoc, arrayUnion, writeBatch, deleteField } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, addDoc, arrayUnion, writeBatch, deleteField, orderBy, limit, startAfter, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-const cfg = { apiKey: "AIzaSyDHUttmxneJt1KZCf3d-9lRqrdxLxx76C0", authDomain: "myweb-88daa.firebaseapp.com", projectId: "myweb-88daa", storageBucket: "myweb-88daa.firebasestorage.app", messagingSenderId: "297038746284", appId: "1:297038746284:web:272d0ecdc8a3cfa3a20509" };
+const cfg = { apiKey: "AIzaSyDjryQAusSAnrF78wnL9ejTJUxwF5cZWMc", authDomain: "chatbox-6d13e.firebaseapp.com", projectId: "chatbox-6d13e", storageBucket: "chatbox-6d13e.firebasestorage.app", messagingSenderId: "8332958370", appId: "1:8332958370:web:96ad1a1fc48a00a26c15fb" };
 const app = initializeApp(cfg);
 const auth = initializeAuth(app, { persistence: inMemoryPersistence });
-const db = getFirestore(app), storage = getStorage(app), A = "my-whatsapp-clone", $ = id => document.getElementById(id), D = (g, id) => doc(db, "artifacts", A, "public", "data", g, id), C = g => collection(db, "artifacts", A, "public", "data", g);
+const db = getFirestore(app), A = "my-whatsapp-clone", $ = id => document.getElementById(id), D = (g, id) => doc(db, "artifacts", A, "public", "data", g, id), C = g => collection(db, "artifacts", A, "public", "data", g);
 
 let uid = null, myId = "", partnerId = "", room = "", unChat, unPresence, unIncoming, presenceTimer, pc, stream, callId, pending, selected = null, replyTo = null, editing = null, queued = [], replyFocusLock = false, replyFocusTimer = null;
+
+// --- Message pagination (keeps the live listener small so opening a chat
+// stays fast and cheap on Firestore reads, instead of syncing the entire
+// history every time). Only the newest PAGE_SIZE messages are kept live;
+// older messages are fetched once, on demand, via "Load earlier messages".
+const PAGE_SIZE = 50;
+let lastLiveSnap = null;
+const olderMessages = new Map();
+let earliestLoadedTs = null;
+let loadingOlder = false;
+let noMoreOlder = false;
+let suppressBottomScroll = false;
 const login = $("login"), chat = $("chat"), call = $("call"), incoming = $("incoming");
 
 function fail(t, e) { console.error(t, e); $("loginStatus").textContent = t + " — " + (e?.code || e?.message || "failed"); }
@@ -545,8 +613,18 @@ function valid(x) { return /^[a-z0-9_-]{2,40}$/.test(x); }
 function render(s) {
   const a = [];
   s.forEach(x => {
-    const data = x.data() || {};
+    // Firestore docs expose a .data() method; the optimistic "local only"
+    // snapshot passed right after sending gives plain already-flat objects.
+    // Handling both here (instead of assuming .data() always exists) is
+    // what makes the instant local echo actually render instead of
+    // silently throwing and forcing the UI to wait for the network round-trip.
+    const data = typeof x.data === "function" ? (x.data() || {}) : x;
     a.push({ id: x.id, ...data });
+  });
+  // Messages fetched by "Load earlier messages" (kept once loaded; the live
+  // listener only tracks the newest PAGE_SIZE, so these must be merged in).
+  olderMessages.forEach((m, id) => {
+    if (!a.some(x => x.id === id)) a.push(m);
   });
   // Optimistic messages are shown immediately while Firestore syncs.
   localMessages.forEach((m, id) => {
@@ -561,6 +639,10 @@ function render(s) {
     return tx - ty;
   });
 
+  // Cursor for "Load earlier messages": the oldest timestamp currently
+  // known across the live window + any already-loaded older pages.
+  earliestLoadedTs = a.length ? (Number(a[0].timestamp) || null) : null;
+
   const box = $("messages");
   const wasNearBottom =
     box.scrollHeight - box.scrollTop - box.clientHeight < 120;
@@ -571,15 +653,28 @@ function render(s) {
     seenMessageIds.add(m.id);
     if (renderedOnce) {
       if (!wasNearBottom) unreadCount++;
-      // Notification sound disabled per user request.
+      playNotifySound();
     }
   });
   if (wasNearBottom) unreadCount = 0;
   renderedOnce = true;
   updateUnreadBadge();
 
-  box.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  const toMarkRead = [];
   let lastDateKey = "";
+
+  if (a.length && !noMoreOlder) {
+    const loadBtn = document.createElement("button");
+    loadBtn.type = "button";
+    loadBtn.disabled = loadingOlder;
+    loadBtn.textContent = loadingOlder ? "Loading…" : "⬆ Load earlier messages";
+    loadBtn.className =
+      "self-center text-xs font-semibold text-teal-700 bg-white/85 border border-teal-700/25 " +
+      "rounded-full px-3 py-1.5 my-1 shadow-sm hover:bg-teal-50 active:scale-95 transition disabled:opacity-60";
+    loadBtn.onclick = loadOlderMessages;
+    frag.append(loadBtn);
+  }
 
   a.forEach(m => {
     // Only hide a message when deletedFor is a real array containing myId.
@@ -600,7 +695,7 @@ function render(s) {
         const sep = document.createElement("div");
         sep.className = "date-sep";
         sep.textContent = label;
-        box.append(sep);
+        frag.append(sep);
       }
     }
 
@@ -803,7 +898,7 @@ function render(s) {
     };
 
     r.append(b);
-    box.append(r);
+    frag.append(r);
 
     // Mark only received, visible messages as read.
     if (
@@ -811,16 +906,57 @@ function render(s) {
       m.status !== "read" &&
       !m.isDeleted
     ) {
-      updateDoc(doc(C("chat_" + room), m.id), { status: "read" }).catch(() => {});
+      toMarkRead.push(m.id);
     }
   });
 
+  box.replaceChildren(frag);
+
+  // One batched write for every newly-read message instead of a separate
+  // round-trip per message — fewer writes means fewer follow-up snapshot
+  // events, which means less redundant re-rendering and a snappier feel.
+  if (toMarkRead.length) {
+    const batch = writeBatch(db);
+    toMarkRead.forEach(id => batch.update(doc(C("chat_" + room), id), { status: "read" }));
+    batch.commit().catch(() => {});
+  }
+
   // Keep the newest message visible. Android's keyboard changes the
   // visual viewport, so anchor to the real bottom after the DOM is painted.
-  if (wasNearBottom || box.scrollTop === 0) {
+  if ((wasNearBottom || box.scrollTop === 0) && !suppressBottomScroll) {
     requestAnimationFrame(() => {
       box.scrollTop = box.scrollHeight;
       requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; });
+    });
+  }
+}
+
+async function loadOlderMessages() {
+  if (loadingOlder || noMoreOlder || !room || earliestLoadedTs == null) return;
+  loadingOlder = true;
+  const emptySnap = { docs: [], forEach: () => {} };
+  render(lastLiveSnap || emptySnap); // repaint the button as "Loading…"
+  try {
+    const snap = await getDocs(
+      query(C("chat_" + room), orderBy("timestamp", "desc"), startAfter(earliestLoadedTs), limit(PAGE_SIZE))
+    );
+    snap.forEach(d => olderMessages.set(d.id, { id: d.id, ...d.data() }));
+    if (snap.size < PAGE_SIZE) noMoreOlder = true;
+  } catch (e) {
+    console.error("Loading older messages failed", e);
+    alert("Could not load older messages. Check your internet connection.");
+  } finally {
+    loadingOlder = false;
+    const box = $("messages");
+    const prevScrollHeight = box.scrollHeight;
+    const prevScrollTop = box.scrollTop;
+    suppressBottomScroll = true;
+    render(lastLiveSnap || emptySnap);
+    requestAnimationFrame(() => {
+      // Keep whatever the user was reading in view instead of snapping
+      // to the bottom now that older messages were inserted above it.
+      box.scrollTop = prevScrollTop + (box.scrollHeight - prevScrollHeight);
+      suppressBottomScroll = false;
     });
   }
 }
@@ -876,6 +1012,7 @@ async function send(imgData = null) {
   i.value = "";
   if (reply) hideReplyBubble();
   requestAnimationFrame(() => i.focus({ preventScroll: true }));
+  updateSendState();
 
   const now = Date.now();
   try {
@@ -992,12 +1129,17 @@ function setTyping(isTyping) {
   typingIsOn = isTyping;
   setDoc(D("presence", myId), { typing: isTyping, typingAt: Date.now() }, { merge: true }).catch(() => {});
 }
+function updateSendState() {
+  $("send").disabled = !$("message").value.trim() && !editing;
+}
 $("message").addEventListener("input", () => {
+  updateSendState();
   if (!uid || !room) return;
   setTyping(true);
   clearTimeout(typingClearTimer);
   typingClearTimer = setTimeout(() => setTyping(false), 1800);
 });
+updateSendState();
 
 function setup() {
   myId = $("myId").value.trim().toLowerCase();
@@ -1009,9 +1151,13 @@ function setup() {
   login.classList.add("hidden");
   chat.classList.remove("hidden");
   unChat = onSnapshot(
-    query(C("chat_" + room)),
+    query(C("chat_" + room), orderBy("timestamp", "desc"), limit(PAGE_SIZE)),
     snap => {
-      console.log("Chat sync:", snap.size, "messages loaded");
+      console.log("Chat sync:", snap.size, "messages loaded (live window)");
+      lastLiveSnap = snap;
+      // If the very first sync already comes back under a full page, the
+      // whole history fits in this window — no older page will ever exist.
+      if (!noMoreOlder && olderMessages.size === 0 && snap.size < PAGE_SIZE) noMoreOlder = true;
       render(snap);
     },
     e => {
@@ -1079,6 +1225,28 @@ function updateUnreadBadge() {
 }
 let callConnectedAt = 0;
 let callDurationTimer = null;
+
+// --- Soft notification sound for incoming messages (WebAudio, no assets needed) ---
+let notifyAudioCtx = null;
+function playNotifySound() {
+  try {
+    notifyAudioCtx = notifyAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (notifyAudioCtx.state === "suspended") notifyAudioCtx.resume().catch(() => {});
+    const t0 = notifyAudioCtx.currentTime;
+    [880, 1180].forEach((freq, i) => {
+      const osc = notifyAudioCtx.createOscillator();
+      const gain = notifyAudioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, t0 + i * 0.09);
+      gain.gain.linearRampToValueAtTime(0.14, t0 + i * 0.09 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + i * 0.09 + 0.24);
+      osc.connect(gain).connect(notifyAudioCtx.destination);
+      osc.start(t0 + i * 0.09);
+      osc.stop(t0 + i * 0.09 + 0.26);
+    });
+  } catch (e) { /* audio not available; ignore silently */ }
+}
 
 // --- Ringtone (incoming) / ringback (outgoing) tone with optional vibration ---
 let ringCtx = null;
@@ -1931,73 +2099,36 @@ $("copyMyId").onclick = async () => { try { await navigator.clipboard.writeText(
 $("copyPartnerId").onclick = async () => { try { await navigator.clipboard.writeText(partnerId); alert("Partner ID copied"); } catch { alert("Partner ID: " + partnerId); } $("menu").classList.add("hidden"); };
 
 $("clearChat").onclick = async () => {
-  if (!confirm("Clear chat sirf aapke phone se clear hoga. Continue?")) return;
+  if (!confirm("Kya aap sach me chat permanent delete karna chahte hain? Yeh data Firebase se dono ke liye hamesha ke liye delete kar dega.")) return;
   try {
-    const snap = await new Promise((resolve, reject) => {
-      const unsub = onSnapshot(query(C("chat_" + room)), snapshot => { unsub(); resolve(snapshot); }, error => { unsub(); reject(error); });
-    });
-    const ids = snap.docs.map(d => d.id);
-    ids.forEach(id => localHiddenMessages.add(id));
-    localStorage.setItem("hiddenMessages", JSON.stringify([...localHiddenMessages].slice(-5000)));
-    render(snap);
+    // A single one-time read of every message id, instead of opening a
+    // whole extra realtime listener channel just to read it once.
+    const snap = await getDocs(query(C("chat_" + room)));
+
     $("menu").classList.add("hidden");
-    // Persist in chunks so Firestore limits and a slow network don't freeze the UI.
+
+    // Firestore se messages ko chunks me permanent delete karna
     for (let i = 0; i < snap.docs.length; i += 400) {
       const batch = writeBatch(db);
-      snap.docs.slice(i, i + 400).forEach(d => batch.update(d.ref, { deletedFor: arrayUnion(myId) }));
+      snap.docs.slice(i, i + 400).forEach(d => {
+        batch.delete(d.ref); // Yeh line document ko permanently delete karti hai
+      });
       await batch.commit();
     }
+
+    // Local screen, pagination cache aur storage clear karna
+    localMessages.clear();
+    localHiddenMessages.clear();
+    olderMessages.clear();
+    noMoreOlder = true;
+    earliestLoadedTs = null;
+    localStorage.removeItem("hiddenMessages");
+    $("messages").innerHTML = "";
+    
   } catch (e) { fail("Clear chat failed", e); }
 };
 
-$("mediaBtn").onclick = () => $("mediaInput").click();
-$("mediaInput").onchange = async e => {
-  const file = e.target.files[0];
-  e.target.value = "";
-  if (!file) return;
 
-  const allowed = file.type.startsWith("image/") || file.type.startsWith("video/") || file.type.startsWith("audio/");
-  if (!allowed) return alert("Please select an image, video, or audio file.");
-  if (file.size > 50 * 1024 * 1024) return alert("Media file must be 50 MB or smaller.");
-
-  try {
-    if (!uid || !room) throw new Error("Chat is not connected yet.");
-
-    const id = "media_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
-    const ext = (file.name.split(".").pop() || "bin").replace(/[^a-z0-9]/gi, "").slice(0, 8) || "bin";
-    const ref = storageRef(storage, "chat_media/" + room + "/" + id + "." + ext);
-
-    await uploadBytes(ref, file, { contentType: file.type });
-    const url = await getDownloadURL(ref);
-    await sendMediaMessage({ id, url, type: file.type, name: file.name, size: file.size });
-  } catch (err) {
-    console.error("Media upload failed:", err);
-    alert("Media upload failed: " + (err?.message || "Check Firebase Storage rules and your internet connection."));
-  }
-};
-
-async function sendMediaMessage({ id, url, type, name, size }) {
-  const d = {
-    text: "", senderId: myId, timestamp: Date.now(), status: "sent",
-    deletedFor: [], isDeleted: false,
-    mediaUrl: url, mediaType: type, fileName: name, fileSize: size
-  };
-  if (replyTo) {
-    d.replyTo = { id: replyTo.id, text: replyTo.text || "media" };
-    hideReplyBubble();
-  }
-  localMessages.set(id, { id, ...d });
-  render({ docs: [], forEach: cb => localMessages.forEach(cb) });
-  requestAnimationFrame(() => {
-    const box = $("messages"); box.scrollTop = box.scrollHeight;
-  });
-  setDoc(doc(C("chat_" + room), id), d).then(() => {
-    localMessages.delete(id);
-  }).catch(e => {
-    console.error("Media message save failed:", e);
-    alert("Media uploaded, but the message could not be saved.");
-  });
-}
 
 $("closeMedia").onclick = () => {
   $("previewVideo").pause();
@@ -2062,6 +2193,7 @@ $("edit").onclick = () => {
   $("message").value = selected.text || ""; 
   $("message").focus(); 
   $("actions").classList.add("hidden"); 
+  updateSendState();
 };
 
 $("deleteMe").onclick = async () => { if (selected) await updateDoc(doc(C("chat_" + room), selected.id), { deletedFor: [...(selected.deletedFor || []), myId] }); $("actions").classList.add("hidden"); };

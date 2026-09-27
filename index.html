@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(self)">
 <title>Secure Cloud</title>
 <script src="https://cdn.tailwindcss.com">
@@ -11,17 +11,40 @@
 
 </script>
 <style>
-html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
-#app{max-width:450px;height:var(--app-height,100dvh);margin:auto;position:relative;overflow:hidden;background:#fff}
+html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6;overscroll-behavior:none}
+body{position:fixed;inset:0;width:100%;overflow:hidden}
+/* #app is pinned with position:fixed and its own top/height, kept in sync
+   with window.visualViewport by JS below. This is what actually stops the
+   "white page fills up under the composer" bug: the old approach only
+   resized #app while leaving it inside a normal-flow body, so a gap opened
+   up between the shrunk #app and the still full-height body whenever the
+   keyboard opened or the page was zoomed. Pinning #app directly to the
+   visual viewport's own top+height means there is nothing left to leave a
+   gap — #app always exactly covers the visible area. */
+#app{max-width:450px;height:var(--app-height,100dvh);width:100%;margin:0 auto;position:fixed;top:0;left:0;right:0;overflow:hidden;background:#fff}
 #chat{height:100%;min-height:0}
 #messages{min-height:0;overflow-anchor:auto;scroll-padding-bottom:12px}
 #composer{flex-shrink:0;position:relative;z-index:5}
 .screen{position:absolute;inset:0}
 .hidden{display:none!important}
-.bubble{max-width:80%;min-width:92px;padding:8px 10px;border-radius:10px;word-break:break-word}
+.bubble{max-width:80%;min-width:92px;padding:8px 10px;border-radius:10px;word-break:break-word;position:relative}
 .sent{background:#dcf8c6}
 .received{background:#fff}
 .modal{background:#0008;z-index:50}
+
+/* Messages should read like WhatsApp, not like a text document: tapping a
+   bubble must never trigger the browser's native text-selection highlight. */
+.bubble,.bubble *{
+  -webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;
+  -webkit-touch-callout:none;
+}
+/* The composer itself must stay a normal, selectable/editable text field. */
+#message,#myId,#partnerId{
+  -webkit-user-select:text;user-select:text;-webkit-touch-callout:default;
+  /* 16px stops iOS Safari's automatic zoom-on-focus, which is what was
+     shoving the composer upward and leaving blank space under it. */
+  font-size:16px;
+}
 
 /* Compact reply bubble shown directly above the message composer. */
 #replyBox{
@@ -43,6 +66,19 @@ html,body{margin:0;height:100%;font-family:Arial;background:#f3f4f6}
 #message.reply-lock{caret-color:#0f766e}
 
 .linkified { color:#2563eb; text-decoration:underline; cursor:pointer; word-break:break-all; }
+
+/* ---------- Multi-select mode ---------- */
+#selectBar{animation:slideUp .2s ease}
+.select-row{background:rgba(15,118,110,.10);border-radius:12px;transition:background .15s}
+.msg-check{
+  display:none;position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;
+  background:#fff;border:2px solid #9ca3af;align-items:center;justify-content:center;
+  font-size:11px;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2);z-index:3;
+}
+#messages.select-mode .msg-check{display:flex}
+#messages.select-mode .bubble{cursor:pointer}
+.msg-check.checked{background:#0f766e;border-color:#0f766e}
+.msg-check.checked:after{content:"✓"}
 #scrollBottom{transition:transform .2s,opacity .2s}
 #scrollBottom:active,#emojiBtn:active{transform:scale(.9)}
 #emojiTray button{cursor:pointer}
@@ -138,6 +174,13 @@ body{
   box-shadow:0 3px 18px rgba(0,0,0,.16);
   z-index:10;
 }
+#selectBar{
+  background:linear-gradient(115deg,#134e4a,#0f766e 60%,#115e59)!important;
+  box-shadow:0 3px 18px rgba(0,0,0,.16);
+}
+#selectAll:hover,#selectAll:active{background:rgba(255,255,255,.28)}
+#selectDeleteMe:hover{transform:translateY(-1px)}
+#selectDeleteMe{transition:transform .15s var(--ease)}
 #dpBtn{
   transition:transform .25s var(--ease),box-shadow .25s var(--ease);
   position:relative;
@@ -383,6 +426,16 @@ html.lite .bubble,html.lite #app{box-shadow:none!important}
   </section>
 
   <section id="chat" class="screen hidden flex flex-col" style="background:#efeae2">
+    <div id="selectBar" class="hidden bg-teal-800 text-white p-3 flex justify-between items-center relative z-10">
+      <div class="flex items-center gap-3 min-w-0">
+        <button id="selectCancel" type="button" class="text-2xl leading-none" aria-label="Cancel selection">✕</button>
+        <b id="selectCount" class="truncate">0 selected</b>
+      </div>
+      <div class="flex items-center gap-4">
+        <button id="selectAll" type="button" class="text-sm font-semibold px-2 py-1 rounded-full bg-white/15" title="Select all">Select all</button>
+        <button id="selectDeleteMe" type="button" class="text-xl" title="Delete selected">🗑</button>
+      </div>
+    </div>
     <header id="chatHeader" class="bg-teal-700 text-white p-3 flex justify-between items-center">
       <div class="flex items-center gap-3 min-w-0">
         <button id="dpBtn" type="button" class="w-11 h-11 rounded-full bg-white/20 overflow-hidden flex items-center justify-center shrink-0" title="Set profile photo">
@@ -400,8 +453,6 @@ html.lite .bubble,html.lite #app{box-shadow:none!important}
         <button id="scrollBottom" class="p-2 text-xl relative" title="Latest messages">↓<span id="unreadBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] leading-none rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">0</span></button>
         <button id="menuBtn" class="p-2 text-xl">⋮</button>
         <div id="menu" class="hidden absolute right-0 top-12 bg-white text-gray-800 w-48 z-20 shadow rounded">
-          <button id="copyMyId" class="block w-full text-left p-3 border-b">Copy my ID</button>
-           <button id="copyPartnerId" class="block w-full text-left p-3 border-b">Copy partner ID</button>
            <button id="clearChat" class="block w-full text-left p-3 border-b text-red-600 font-bold">Clear chat</button>
           <button id="themeBtn" class="block w-full text-left p-3">Chat theme</button>
           <button id="bgBtn" class="block w-full text-left p-3">Background color</button>
@@ -477,6 +528,7 @@ html.lite .bubble,html.lite #app{box-shadow:none!important}
       <button id="react" class="w-full text-left p-4 border-b hover:bg-gray-50">😊 React</button>
       <button id="reply" class="w-full text-left p-4 border-b hover:bg-gray-50">↩ Reply</button>
       <button id="copy" class="w-full text-left p-4 border-b hover:bg-gray-50">📋 Copy</button>
+      <button id="selectMsg" class="w-full text-left p-4 border-b hover:bg-gray-50">☑ Select</button>
       <button id="edit" class="w-full text-left p-4 border-b hover:bg-gray-50">✎ Edit</button>
       <button id="deleteMe" class="w-full text-left p-4 border-b hover:bg-gray-50">Delete for me</button>
       <button id="deleteAll" class="w-full text-left p-4 border-b text-red-600 hover:bg-gray-50 hidden">Delete for everyone</button>
@@ -585,7 +637,7 @@ function linkifyText(text) {
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { initializeAuth, inMemoryPersistence, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, addDoc, arrayUnion, writeBatch, deleteField, orderBy, limit, startAfter, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, addDoc, arrayUnion, writeBatch, deleteField, orderBy, limit, startAfter, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const cfg = { apiKey: "AIzaSyDjryQAusSAnrF78wnL9ejTJUxwF5cZWMc", authDomain: "chatbox-6d13e.firebaseapp.com", projectId: "chatbox-6d13e", storageBucket: "chatbox-6d13e.firebasestorage.app", messagingSenderId: "8332958370", appId: "1:8332958370:web:96ad1a1fc48a00a26c15fb" };
 const app = initializeApp(cfg);
@@ -593,6 +645,40 @@ const auth = initializeAuth(app, { persistence: inMemoryPersistence });
 const db = getFirestore(app), A = "my-whatsapp-clone", $ = id => document.getElementById(id), D = (g, id) => doc(db, "artifacts", A, "public", "data", g, id), C = g => collection(db, "artifacts", A, "public", "data", g);
 
 let uid = null, myId = "", partnerId = "", room = "", unChat, unPresence, unIncoming, presenceTimer, pc, stream, callId, pending, selected = null, replyTo = null, editing = null, queued = [], replyFocusLock = false, replyFocusTimer = null;
+
+// --- Multi-select mode (long-press a message → "Select" to start it) ---
+let selectMode = false;
+const selectedIds = new Set();
+function rerenderMessages() { render(lastLiveSnap || { docs: [], forEach: () => {} }); }
+function updateSelectBar() {
+  $("selectCount").textContent = selectedIds.size + " selected";
+}
+function enterSelectMode(firstId) {
+  selectMode = true;
+  selectedIds.clear();
+  if (firstId) selectedIds.add(firstId);
+  $("chatHeader").classList.add("hidden");
+  $("replyBox").classList.add("hidden");
+  $("selectBar").classList.remove("hidden");
+  $("messages").classList.add("select-mode");
+  updateSelectBar();
+  rerenderMessages();
+}
+function exitSelectMode() {
+  selectMode = false;
+  selectedIds.clear();
+  $("chatHeader").classList.remove("hidden");
+  $("selectBar").classList.add("hidden");
+  $("messages").classList.remove("select-mode");
+  rerenderMessages();
+}
+function toggleMessageSelect(id) {
+  if (selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  if (selectedIds.size === 0) { exitSelectMode(); return; }
+  updateSelectBar();
+  rerenderMessages();
+}
 
 // --- Message pagination (keeps the live listener small so opening a chat
 // stays fast and cheap on Firestore reads, instead of syncing the entire
@@ -609,6 +695,8 @@ const login = $("login"), chat = $("chat"), call = $("call"), incoming = $("inco
 
 function fail(t, e) { console.error(t, e); $("loginStatus").textContent = t + " — " + (e?.code || e?.message || "failed"); }
 function valid(x) { return /^[a-z0-9_-]{2,40}$/.test(x); }
+// IDs are stored/compared lowercase internally; this only affects display.
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
 function render(s) {
   const a = [];
@@ -700,14 +788,17 @@ function render(s) {
     }
 
     const r = document.createElement("div");
-    r.className = "flex " + (m.senderId === myId ? "justify-end" : "justify-start");
+    const isPicked = selectedIds.has(m.id);
+    r.className = "flex p-1 " + (m.senderId === myId ? "justify-end" : "justify-start") + (isPicked ? " select-row" : "");
     r.style.willChange = "transform,opacity";
+    r.dataset.mid = m.id;
 
     const b = document.createElement("div");
     b.className =
       "bubble " +
       (m.senderId === myId ? "sent" : "received") +
       " shadow-sm cursor-pointer";
+    b.dataset.mid = m.id;
 
     if (m.replyTo) {
       const rep = document.createElement("div");
@@ -750,6 +841,7 @@ function render(s) {
         img.decoding = "async";
         img.onclick = e => {
           e.stopPropagation();
+          if (selectMode) { toggleMessageSelect(m.id); return; }
           $("previewImg").src = mediaUrl;
           $("previewImg").classList.remove("hidden");
           $("previewVideo").classList.add("hidden");
@@ -827,6 +919,11 @@ function render(s) {
       b.appendChild(row);
     }
 
+    const check = document.createElement("span");
+    check.className = "msg-check" + (isPicked ? " checked" : "");
+    check.setAttribute("aria-hidden", "true");
+    b.appendChild(check);
+
     attachHeartDoubleTap(b, m);
 
     let sx = 0, sy = 0;
@@ -837,6 +934,7 @@ function render(s) {
     };
 
     b.ontouchend = e => {
+      if (selectMode) return;
       if (!e.changedTouches[0]) return;
       const dx = e.changedTouches[0].clientX - sx;
       const dy = e.changedTouches[0].clientY - sy;
@@ -867,6 +965,7 @@ function render(s) {
     };
 
     b.addEventListener("pointerdown", e => {
+      if (selectMode) return;
       if (e.target.closest("a, img, button")) return;
       longPressTriggered = false;
       pressStartX = e.clientX; pressStartY = e.clientY;
@@ -890,6 +989,12 @@ function render(s) {
     b.addEventListener("contextmenu", e => { e.preventDefault(); e.stopPropagation(); });
 
     b.onclick = e => {
+      if (selectMode) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleMessageSelect(m.id);
+        return;
+      }
       if (e.target.closest("a, img, button")) return;
       if (b.dataset.swipeReply === "1" || longPressTriggered) {
         longPressTriggered = false;
@@ -1147,9 +1252,32 @@ function setup() {
   if (!valid(myId) || !valid(partnerId) || myId === partnerId) return alert("Valid, different IDs enter karein.");
   localStorage.setItem("whatsapp_my_id", myId);
   room = [myId, partnerId].sort().join("_");
-  $("partnerName").textContent = partnerId;
+  $("partnerName").textContent = cap(partnerId);
   login.classList.add("hidden");
   chat.classList.remove("hidden");
+
+  // Restore this ID's profile photo: instantly from the local cache, then
+  // reconcile against Firestore (the source of truth) so the same ID on a
+  // different browser/device converges on the same photo.
+  const cachedDp = localStorage.getItem("chat-dp-" + myId);
+  if (cachedDp) {
+    $("partnerDp").src = cachedDp;
+    $("partnerDp").classList.remove("hidden");
+    $("dpPlaceholder").classList.add("hidden");
+  } else {
+    $("partnerDp").classList.add("hidden");
+    $("dpPlaceholder").classList.remove("hidden");
+  }
+  getDoc(D("presence", myId)).then(snap => {
+    const dp = snap.data()?.dp;
+    if (dp && dp !== cachedDp) {
+      $("partnerDp").src = dp;
+      $("partnerDp").classList.remove("hidden");
+      $("dpPlaceholder").classList.add("hidden");
+      localStorage.setItem("chat-dp-" + myId, dp);
+    }
+  }).catch(() => {});
+
   unChat = onSnapshot(
     query(C("chat_" + room), orderBy("timestamp", "desc"), limit(PAGE_SIZE)),
     snap => {
@@ -1175,7 +1303,7 @@ function listenIncoming() {
     const d = s.data();
     if (d && d.caller && Date.now() - Number(d.timestamp || 0) < 30000) {
       pending = d;
-      $("caller").textContent = d.caller + (d.type === "video" ? " is video calling" : " is calling");
+      $("caller").textContent = cap(d.caller) + (d.type === "video" ? " is video calling" : " is calling");
       setCallAvatar($("callerAvatarImg"), $("callerAvatarInitial"), d.caller);
       if (incoming.classList.contains("hidden")) startRing("in");
       incoming.classList.remove("hidden");
@@ -1288,7 +1416,7 @@ function stopRing() {
 
 // --- Show partner's saved display photo (if any) or their initial in call avatars ---
 function setCallAvatar(imgEl, initialEl, name) {
-  const dp = localStorage.getItem("chat-dp");
+  const dp = localStorage.getItem("chat-dp-" + myId);
   if (dp) {
     imgEl.src = dp;
     imgEl.classList.remove("hidden");
@@ -1683,7 +1811,7 @@ async function start(video) {
   $("local").classList.toggle("hidden", !video);
   $("remote").classList.toggle("hidden", !video);
   $("audioOnly").classList.toggle("hidden", video);
-  $("callName").textContent = partnerId;
+  $("callName").textContent = cap(partnerId);
   $("callState").textContent = "Calling…";
   stopCallTimer();
   $("speaker").textContent = "🔊 Speaker On";
@@ -1778,7 +1906,7 @@ async function acceptCall() {
   $("local").classList.toggle("hidden", d.type !== "video");
   $("remote").classList.toggle("hidden", d.type !== "video");
   $("audioOnly").classList.toggle("hidden", d.type === "video");
-  $("callName").textContent = partnerId;
+  $("callName").textContent = cap(partnerId);
   $("callState").textContent = "Connecting…";
   stopCallTimer();
   $("speaker").textContent = "🔊 Speaker On";
@@ -1837,8 +1965,15 @@ $("send").onclick = () => {
   $("send").classList.add("sending");
   send().finally(() => $("message").focus({ preventScroll: true }));
 };
+// Coarse-pointer/touch devices use an on-screen keyboard whose "Enter" key
+// should behave like every chat app's soft keyboard: it inserts a new line.
+// Only a real, physical keyboard's Enter should send — Shift+Enter still
+// inserts a new line there, same as before.
+const isTouchDevice = window.matchMedia?.("(pointer: coarse)")?.matches || "ontouchstart" in window;
 $("message").onkeydown = e => { 
-  if (e.key === "Enter" && !e.shiftKey) { 
+  if (e.key !== "Enter" || e.isComposing) return;
+  if (isTouchDevice) return; // let the soft keyboard insert its own newline
+  if (!e.shiftKey) { 
     e.preventDefault(); 
     send(); 
   } 
@@ -2026,16 +2161,46 @@ $("menuBtn").onclick = () => $("menu").classList.toggle("hidden");
 
 $("dpBtn").onclick = () => $("dpInput").click();
 
+// Shrinks/compresses a picked photo before it's stored, so it stays small
+// enough for a Firestore field (needed to sync it — see below) and loads fast.
+function resizeImageDataUrl(dataUrl, maxDim = 256) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) { height = Math.round(height * maxDim / width); width = maxDim; }
+        else { width = Math.round(width * maxDim / height); height = maxDim; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
 $("dpInput").onchange = e => {
   const file = e.target.files?.[0];
   if (!file) return;
   if (!file.type.startsWith("image/")) return alert("Please select an image.");
   const reader = new FileReader();
-  reader.onload = event => {
-    $("partnerDp").src = event.target.result;
-    $("partnerDp").classList.remove("hidden");
-    $("dpPlaceholder").classList.add("hidden");
-    localStorage.setItem("chat-dp", event.target.result);
+  reader.onload = async event => {
+    try {
+      const resized = await resizeImageDataUrl(event.target.result, 256);
+      $("partnerDp").src = resized;
+      $("partnerDp").classList.remove("hidden");
+      $("dpPlaceholder").classList.add("hidden");
+      localStorage.setItem("chat-dp-" + myId, resized);
+      // Save it against this ID in Firestore, not just this browser, so
+      // logging in with the same ID elsewhere shows the same photo.
+      if (myId) await setDoc(D("presence", myId), { dp: resized }, { merge: true });
+    } catch (err) {
+      fail("Saving profile photo failed", err);
+    }
   };
   reader.readAsDataURL(file);
 };
@@ -2076,13 +2241,6 @@ $("customThemeColor").oninput = e => {
   applyTheme("custom", e.target.value);
 };
 
-const savedDp = localStorage.getItem("chat-dp");
-if (savedDp) {
-  $("partnerDp").src = savedDp;
-  $("partnerDp").classList.remove("hidden");
-  $("dpPlaceholder").classList.add("hidden");
-}
-
 const savedTheme = localStorage.getItem("chat-theme");
 if (savedTheme) {
   try {
@@ -2094,9 +2252,6 @@ $("bgBtn").onclick = () => { $("colors").classList.remove("hidden"); $("menu").c
 $("closeColors").onclick = () => $("colors").classList.add("hidden");
 document.querySelectorAll("[data-bg]").forEach(b => b.onclick = () => { chat.style.background = b.dataset.bg; localStorage.setItem("chat-bg", b.dataset.bg); $("colors").classList.add("hidden"); });
 if (localStorage.getItem("chat-bg")) chat.style.background = localStorage.getItem("chat-bg");
-
-$("copyMyId").onclick = async () => { try { await navigator.clipboard.writeText(myId); alert("Your ID copied"); } catch { alert("Your ID: " + myId); } $("menu").classList.add("hidden"); };
-$("copyPartnerId").onclick = async () => { try { await navigator.clipboard.writeText(partnerId); alert("Partner ID copied"); } catch { alert("Partner ID: " + partnerId); } $("menu").classList.add("hidden"); };
 
 $("clearChat").onclick = async () => {
   if (!confirm("Kya aap sach me chat permanent delete karna chahte hain? Yeh data Firebase se dono ke liye hamesha ke liye delete kar dega.")) return;
@@ -2188,6 +2343,33 @@ $("copy").onclick = async () => {
   $("actions").classList.add("hidden");
 };
 
+$("selectMsg").onclick = () => {
+  $("actions").classList.add("hidden");
+  if (selected) enterSelectMode(selected.id);
+};
+
+$("selectCancel").onclick = () => exitSelectMode();
+
+$("selectAll").onclick = () => {
+  document.querySelectorAll("#messages [data-mid]").forEach(el => selectedIds.add(el.dataset.mid));
+  updateSelectBar();
+  rerenderMessages();
+};
+
+$("selectDeleteMe").onclick = async () => {
+  if (!selectedIds.size) return;
+  const ids = [...selectedIds];
+  if (!confirm(`Delete ${ids.length} selected message(s) for you? This only removes them from your side.`)) return;
+  try {
+    const batch = writeBatch(db);
+    ids.forEach(id => batch.update(doc(C("chat_" + room), id), { deletedFor: arrayUnion(myId) }));
+    await batch.commit();
+  } catch (e) {
+    fail("Delete selected failed", e);
+  }
+  exitSelectMode();
+};
+
 $("edit").onclick = () => { 
   editing = selected; 
   $("message").value = selected.text || ""; 
@@ -2226,14 +2408,22 @@ const timer = setTimeout(() => { if (!uid) { $("loginStatus").textContent = "Fir
 
 function syncAppToVisualViewport() {
   const vv = window.visualViewport;
+  const appEl = document.getElementById("app");
   if (!vv) {
     document.documentElement.style.setProperty("--app-height", `${window.innerHeight}px`);
+    if (appEl) appEl.style.top = "0px";
     return;
   }
 
   // visualViewport.height becomes the visible area above the Android keyboard.
   // Keep the whole chat inside that area so the composer follows the keyboard.
   document.documentElement.style.setProperty("--app-height", `${vv.height}px`);
+
+  // offsetTop is how far the visible area has scrolled down from the top of
+  // the page (e.g. while the keyboard is open). Pinning #app's own top to
+  // this — instead of leaving #app inside normal page flow — is what keeps
+  // no blank strip from ever showing under the composer.
+  if (appEl) appEl.style.top = `${vv.offsetTop}px`;
 
   // Keep the focused input visible after the viewport changes.
   if (document.activeElement === $("message")) {

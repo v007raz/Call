@@ -167,16 +167,22 @@ body{
 #loginStatus{transition:color .25s,opacity .25s}
 
 /* ---------- Header ---------- */
+:root{
+  --header-from:#831843;--header-mid:#be185d;--header-to:#db2777;
+  --select-from:#500724;--select-mid:#be185d;--select-to:#9d174d;
+}
 #chatHeader{
-  background:linear-gradient(115deg,#075e54,#0f766e 55%,#0d9488)!important;
+  background:linear-gradient(115deg,var(--header-from),var(--header-mid) 55%,var(--header-to))!important;
   background-size:200% 200%;
   animation:headerSheen 12s ease-in-out infinite;
   box-shadow:0 3px 18px rgba(0,0,0,.16);
+  transition:background 1s var(--ease);
   z-index:10;
 }
 #selectBar{
-  background:linear-gradient(115deg,#134e4a,#0f766e 60%,#115e59)!important;
+  background:linear-gradient(115deg,var(--select-from),var(--select-mid) 60%,var(--select-to))!important;
   box-shadow:0 3px 18px rgba(0,0,0,.16);
+  transition:background 1s var(--ease);
 }
 #selectAll:hover,#selectAll:active{background:rgba(255,255,255,.28)}
 #selectDeleteMe:hover{transform:translateY(-1px)}
@@ -191,8 +197,8 @@ body{
   background:#9ca3af;box-shadow:0 0 0 rgba(74,222,128,.6);flex-shrink:0;
   transition:background .3s;
 }
-#statusDot.online{background:#4ade80;animation:pulseDot 1.8s ease-out infinite}
-#statusDot.typing{background:#facc15;animation:pulseDot 1s ease-out infinite}
+#statusDot.online{--dot-glow:var(--status-online-glow,rgba(74,222,128,.55));background:var(--status-online,#4ade80);animation:pulseDot 1.8s ease-out infinite}
+#statusDot.typing{--dot-glow:rgba(250,204,21,.55);background:#facc15;animation:pulseDot 1s ease-out infinite}
 #status{opacity:.9;transition:opacity .25s;display:inline-flex;align-items:center}
 
 /* ---------- Messages area ---------- */
@@ -358,7 +364,7 @@ body{
 @keyframes mediaIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
 @keyframes localFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
 @keyframes pulseSoft{0%,100%{opacity:.7}50%{opacity:1}}
-@keyframes pulseDot{0%{box-shadow:0 0 0 0 rgba(74,222,128,.55)}100%{box-shadow:0 0 0 8px rgba(74,222,128,0)}}
+@keyframes pulseDot{0%{box-shadow:0 0 0 0 var(--dot-glow,rgba(74,222,128,.55))}100%{box-shadow:0 0 0 8px rgba(0,0,0,0)}}
 @keyframes ringRing{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
 @keyframes callRing{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.85);opacity:0}}
 @keyframes acceptGlow{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}100%{box-shadow:0 0 0 14px rgba(34,197,94,0)}}
@@ -385,6 +391,62 @@ html.lite #composer,html.lite #replyBox,html.lite .modal,html.lite .date-sep{
 html.lite #messages{background-image:none!important}
 html.lite #login:before,html.lite #login:after{display:none!important}
 html.lite .bubble,html.lite #app{box-shadow:none!important}
+
+/* ---------- Theme-reactive premium message bubbles ---------- */
+:root{
+  --bubble-sent-bg:linear-gradient(135deg,#be185d,#ec4899);
+  --bubble-sent-color:#fdf2f8;
+  --bubble-sent-shadow:0 3px 12px rgba(190,24,93,.30);
+  --bubble-received-bg:#ffffff;
+  --bubble-received-color:#831843;
+  --bubble-received-border:rgba(190,24,93,.10);
+  --bubble-received-shadow:0 2px 10px rgba(15,23,42,.08);
+  --bubble-meta-sent:rgba(255,255,255,.82);
+  --bubble-meta-received:#6b7280;
+  --bubble-tick-read:#a7f3d0;
+  --status-online:#fb7185;
+  --status-online-glow:rgba(251,113,133,.55);
+}
+.bubble{transition:background .35s var(--ease),color .35s var(--ease),box-shadow .35s var(--ease),border-color .35s var(--ease)}
+.sent{background:var(--bubble-sent-bg)!important;color:var(--bubble-sent-color)!important;box-shadow:var(--bubble-sent-shadow)!important;border:1px solid rgba(255,255,255,.14)}
+.received{background:var(--bubble-received-bg)!important;color:var(--bubble-received-color)!important;box-shadow:var(--bubble-received-shadow)!important;border:1px solid var(--bubble-received-border)}
+.sent small.text-gray-500{color:var(--bubble-meta-sent)!important}
+.sent small .text-blue-600{color:var(--bubble-tick-read)!important}
+.received small.text-gray-500{color:var(--bubble-meta-received)!important}
+.sent .linkified{color:#e0f2fe!important;text-decoration-color:rgba(255,255,255,.55)}
+.sent .reply-preview{background:rgba(255,255,255,.16)!important;border-left-color:rgba(255,255,255,.85)!important;color:rgba(255,255,255,.94)!important}
+.sent.text-gray-400{color:rgba(255,255,255,.72)!important}
+
+/* ---------- Premium calling icons ---------- */
+.call-icon-btn{
+  width:38px;height:38px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);color:#fff;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  box-shadow:0 2px 10px rgba(0,0,0,.14);
+  transition:transform .2s var(--ease),background .2s,box-shadow .2s;
+}
+.call-icon-btn:hover{background:rgba(255,255,255,.26);transform:translateY(-1px) scale(1.06);box-shadow:0 6px 18px rgba(0,0,0,.24)}
+.call-icon-btn:active{transform:scale(.92)}
+
+.callctrl-btn{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  min-width:66px;padding:11px 12px;border-radius:20px;color:#fff;font-size:11px;font-weight:600;letter-spacing:.01em;
+  background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.14);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+.callctrl-btn svg{display:block}
+.callctrl-btn.active{background:linear-gradient(135deg,#dc2626,#ef4444)!important;border-color:transparent}
+
+.callend-btn,.callaccept-btn{
+  width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;
+  transition:transform .2s var(--ease),box-shadow .2s,filter .2s;
+}
+.callend-btn{background:linear-gradient(135deg,#dc2626,#ef4444);box-shadow:0 8px 26px rgba(220,38,38,.5)}
+.callend-btn svg{transform:rotate(135deg)}
+.callaccept-btn{background:linear-gradient(135deg,#16a34a,#22c55e);box-shadow:0 8px 26px rgba(22,163,74,.5)}
+.callend-btn:hover,.callaccept-btn:hover{transform:translateY(-2px) scale(1.05)}
+.callend-btn:active,.callaccept-btn:active{transform:scale(.92)}
 </style>
 
 </head>
@@ -425,7 +487,7 @@ html.lite .bubble,html.lite #app{box-shadow:none!important}
     <p id="loginStatus" class="text-center text-sm mt-4 text-gray-500">Initializing Firebase…</p>
   </section>
 
-  <section id="chat" class="screen hidden flex flex-col" style="background:#efeae2">
+  <section id="chat" class="screen hidden flex flex-col" style="background:#fce7f3">
     <div id="selectBar" class="hidden bg-teal-800 text-white p-3 flex justify-between items-center relative z-10">
       <div class="flex items-center gap-3 min-w-0">
         <button id="selectCancel" type="button" class="text-2xl leading-none" aria-label="Cancel selection">✕</button>
@@ -448,8 +510,12 @@ html.lite .bubble,html.lite #app{box-shadow:none!important}
         </div>
       </div>
       <div class="flex items-center gap-3 relative">
-        <button id="audioCall" class="p-2 text-xl">☎</button>
-        <button id="videoCall" class="p-2 text-xl">▣</button>
+        <button id="audioCall" class="call-icon-btn" title="Voice call" aria-label="Voice call">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.01l-2.2 2.21z"/></svg>
+        </button>
+        <button id="videoCall" class="call-icon-btn" title="Video call" aria-label="Video call">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h9A1.5 1.5 0 0 1 15 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 3 16.5v-9Z"/><path d="M16.5 10.2 20.3 7.7c.44-.3 1.03.02 1.03.55v7.5c0 .53-.59.85-1.03.55l-3.8-2.5v-3.6Z"/></svg>
+        </button>
         <button id="scrollBottom" class="p-2 text-xl relative" title="Latest messages">↓<span id="unreadBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] leading-none rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">0</span></button>
         <button id="menuBtn" class="p-2 text-xl">⋮</button>
         <div id="menu" class="hidden absolute right-0 top-12 bg-white text-gray-800 w-48 z-20 shadow rounded">
@@ -499,10 +565,21 @@ html.lite .bubble,html.lite #app{box-shadow:none!important}
       <p id="callState">Calling…</p><p id="callDuration" class="text-sm opacity-80 hidden">00:00</p>
     </div>
     <div class="absolute bottom-8 w-full flex justify-center gap-3 flex-wrap px-4">
-      <button id="mute" class="bg-gray-700 rounded-full px-4 py-3">🎙 Mute</button>
-      <button id="speaker" class="bg-gray-700 rounded-full px-4 py-3">🔊 Speaker</button>
-      <button id="toggleVideo" class="bg-gray-700 rounded-full px-4 py-3">📹 Video</button>
-      <button id="end" class="bg-red-600 rounded-full px-4 py-3">End</button>
+      <button id="mute" class="callctrl-btn" title="Mute microphone">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z" fill="currentColor"/><path d="M6 11a6 6 0 0 0 12 0M12 17v3m-3 0h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span class="callctrl-label">Mute</span>
+      </button>
+      <button id="speaker" class="callctrl-btn" title="Toggle speaker">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 9v6h4l5 4V5L8 9H4Z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"/></svg>
+        <span class="callctrl-label">Speaker On</span>
+      </button>
+      <button id="toggleVideo" class="callctrl-btn" title="Toggle video">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h9A1.5 1.5 0 0 1 15 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 3 16.5v-9Z" fill="currentColor"/><path d="M16.5 10.2 20 8v8l-3.5-2.2v-3.6Z" fill="currentColor"/></svg>
+        <span class="callctrl-label">Video</span>
+      </button>
+      <button id="end" class="callend-btn" title="End call" aria-label="End call">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08C.11 12.91 0 12.66 0 12.38c0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.68-1.36-2.66-1.85-.33-.16-.56-.51-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/></svg>
+      </button>
     </div>
   </section>
 
@@ -518,8 +595,12 @@ html.lite .bubble,html.lite #app{box-shadow:none!important}
     </div>
     <h2 id="caller" class="text-2xl"></h2>
     <div class="flex gap-8">
-      <button id="reject" class="bg-red-600 rounded-full px-6 py-3">Reject</button>
-      <button id="accept" class="bg-green-600 rounded-full px-6 py-3">Accept</button>
+      <button id="reject" class="callend-btn" title="Decline" aria-label="Decline call">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08C.11 12.91 0 12.66 0 12.38c0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.68-1.36-2.66-1.85-.33-.16-.56-.51-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/></svg>
+      </button>
+      <button id="accept" class="callaccept-btn" title="Accept" aria-label="Accept call">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.01l-2.2 2.21z"/></svg>
+      </button>
     </div>
   </div>
 
@@ -1318,17 +1399,29 @@ function listenIncoming() {
 }
 
 // WebRTC configuration.
-// STUN helps discover public network addresses. A TURN server is strongly
-// recommended for production because some mobile networks/WebViews cannot
-// connect peer-to-peer without relay support.
+// STUN only discovers a public address; it does NOT work when both sides
+// sit behind "symmetric"/carrier-grade NAT (very common on mobile data and
+// many home routers) — that's exactly why this worked on the same Wi-Fi but
+// failed across networks. A TURN server relays the media in that case, so
+// it's included below (Open Relay Project's free public TURN service) with
+// both UDP and a TCP/443 fallback for networks that block UDP entirely.
+// Several independent STUN servers are listed too — if one is briefly
+// unreachable/rate-limited the others still let candidate gathering finish.
+// For heavier day-to-day use, swap these for your own TURN server (coturn,
+// Metered, Twilio, Cloudflare Calls) — free public relays are rate-limited
+// and can go down; the app also copes with that at runtime (see
+// attemptHardReconnect below), but a paid TURN server is more reliable.
 const rtc = {
   iceServers: [
-    { urls: "stun:stun.l.google.com:19302" }
-    // IMPORTANT: STUN alone cannot connect every network. For reliable calls,
-    // add a TURN server (coturn, Twilio, Metered, Cloudflare Calls, etc.).
-    // { urls: "turn:YOUR_TURN_HOST:3478", username: "USERNAME", credential: "PASSWORD" }
-    // Add your TURN server here when available:
-    // { urls: "turn:YOUR_TURN_HOST:3478", username: "USERNAME", credential: "PASSWORD" }
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:global.stun.twilio.com:3478" },
+    { urls: "stun:openrelay.metered.ca:80" },
+    { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+    { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+    // TCP-over-443 relay — gets through networks/firewalls that block plain UDP.
+    { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
   ],
   iceCandidatePoolSize: 10
 };
@@ -1337,6 +1430,22 @@ let unAnswer = null;
 let unCandidates = null;
 let unCallState = null;
 let callEnded = false;
+
+// --- Auto-reconnect (ICE restart) state ---
+// When a call's network path breaks mid-call (phone switches from Wi-Fi to
+// mobile data, a network hiccups, etc.), WebRTC can often recover in place
+// instead of the call just dying — this is what drives that recovery.
+let amCaller = false;
+let restartInProgress = false;
+let iceFailTimer = null;
+let mySeq = 0;
+let lastAppliedRestartSeq = 0;
+let lastAppliedAnswerSeq = 0;
+// Tracks whether this call has already escalated to a relay-only (TURN-forced)
+// reconnect attempt, so it's only ever tried once per call (see
+// attemptHardReconnect / watchCallState below).
+let hardReconnectDone = false;
+let calleeHardened = false;
 let localHiddenMessages = new Set(JSON.parse(localStorage.getItem("hiddenMessages") || "[]"));
 let localMessages = new Map();
 let seenMessageIds = new Set();
@@ -1495,7 +1604,93 @@ function watchCallState() {
       stopRing();
       $("callAvatarWrap").classList.add("connected");
     }
+
+    // --- ICE restart handshake, riding on this same document ---
+    // The caller writes a fresh "restart offer" when the connection drops;
+    // the callee answers it here, and the caller applies that answer below.
+    if (!amCaller && pc && d.restartOffer && d.restartSeq && d.restartSeq !== lastAppliedRestartSeq) {
+      lastAppliedRestartSeq = d.restartSeq;
+      (async () => {
+        try {
+          if (d.restartRelay && !calleeHardened && stream) {
+            // The caller escalated to a relay-only reconnect — rebuild this
+            // side's connection the same way so both ends agree on a
+            // TURN-relayed path instead of retrying the direct/STUN path
+            // that already failed.
+            calleeHardened = true;
+            try { pc.close(); } catch {}
+            pc = peer(false, { relayOnly: true });
+          }
+          await pc.setRemoteDescription(d.restartOffer);
+          await addQueuedCandidates();
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          await setDoc(D("call_state", callId), {
+            restartAnswer: { type: answer.type, sdp: answer.sdp },
+            restartAnswerSeq: d.restartSeq
+          }, { merge: true });
+        } catch (e) {
+          console.warn("Applying reconnect offer failed:", e);
+        }
+      })();
+    }
+    if (amCaller && pc && d.restartAnswer && d.restartAnswerSeq === mySeq && d.restartAnswerSeq !== lastAppliedAnswerSeq) {
+      lastAppliedAnswerSeq = d.restartAnswerSeq;
+      pc.setRemoteDescription(d.restartAnswer).catch(e => console.warn("Applying reconnect answer failed:", e));
+    }
   }, e => console.warn("Call state listener error:", e));
+}
+
+// Tries to heal a call whose network path broke, instead of just letting it
+// die. Only the caller side initiates (mirrors the original offer/answer
+// roles); the callee reacts to it inside watchCallState above.
+async function attemptIceRestart() {
+  if (!pc || !callId || callEnded || restartInProgress || !amCaller) return;
+  restartInProgress = true;
+  try {
+    const offer = await pc.createOffer({ iceRestart: true });
+    await pc.setLocalDescription(offer);
+    mySeq++;
+    await setDoc(D("call_state", callId), {
+      restartOffer: { type: offer.type, sdp: offer.sdp },
+      restartSeq: mySeq
+    }, { merge: true });
+  } catch (e) {
+    console.warn("ICE restart attempt failed:", e);
+  } finally {
+    restartInProgress = false;
+  }
+}
+
+// A plain ICE restart re-tries the same (direct/STUN) path and often isn't
+// enough on its own when one side is behind a symmetric NAT or a strict
+// firewall — the classic "works on the same Wi-Fi, fails a bit further
+// away" symptom. This rebuilds the whole peer connection forced to route
+// everything through the TURN relay instead, and asks the other side (via
+// the same call_state document) to rebuild its side the same way, so both
+// ends agree on a relay-only path that gets through almost any network.
+async function attemptHardReconnect() {
+  if (!pc || !callId || callEnded || !amCaller || hardReconnectDone || !stream) return;
+  hardReconnectDone = true;
+  try {
+    console.log("Escalating to a relay-only (TURN-forced) reconnect…");
+    try { pc.close(); } catch {}
+    pc = peer(true, { relayOnly: true });
+    const offer = await pc.createOffer({
+      iceRestart: true,
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: callStartedVideo
+    });
+    await pc.setLocalDescription(offer);
+    mySeq++;
+    await setDoc(D("call_state", callId), {
+      restartOffer: { type: offer.type, sdp: offer.sdp },
+      restartSeq: mySeq,
+      restartRelay: true
+    }, { merge: true });
+  } catch (e) {
+    console.warn("Relay-only reconnect failed:", e);
+  }
 }
 
 async function finishCall(status = "ended") {
@@ -1573,13 +1768,22 @@ function reset() {
   stream = null;
   pending = null;
   queued = [];
+  amCaller = false;
+  restartInProgress = false;
+  clearTimeout(iceFailTimer);
+  iceFailTimer = null;
+  mySeq = 0;
+  lastAppliedRestartSeq = 0;
+  lastAppliedAnswerSeq = 0;
+  hardReconnectDone = false;
+  calleeHardened = false;
   $("remote").srcObject = null;
   $("local").srcObject = null;
-  $("mute").textContent = "🎙 Mute";
+  $("mute").querySelector(".callctrl-label").textContent = "Mute";
   $("mute").classList.remove("active");
-  $("toggleVideo").textContent = "📹 Video";
+  $("toggleVideo").querySelector(".callctrl-label").textContent = "Video";
   $("toggleVideo").classList.remove("active");
-  $("speaker").textContent = "🔊 Speaker On";
+  $("speaker").querySelector(".callctrl-label").textContent = "Speaker On";
   $("speaker").classList.remove("active");
   $("callAvatarWrap").classList.remove("connected");
   call.classList.remove("swapped");
@@ -1590,11 +1794,47 @@ function reset() {
   chat.classList.remove("hidden");
 }
 
-function peer(caller) {
-  pc = new RTCPeerConnection(rtc);
+function peer(caller, opts = {}) {
+  // relayOnly forces every candidate through the TURN relay — used by
+  // attemptHardReconnect() when the normal (direct/STUN) path can't get
+  // through a symmetric NAT or strict firewall on one side's network.
+  const cfg = opts.relayOnly ? { ...rtc, iceTransportPolicy: "relay" } : rtc;
+  pc = new RTCPeerConnection(cfg);
+  amCaller = !!caller;
 
   if (stream) {
     stream.getTracks().forEach(t => pc.addTrack(t, stream));
+  }
+
+  // On a shaky/long-distance connection, let WebRTC trade resolution for a
+  // smoother, less stuttery picture rather than holding resolution and
+  // freezing — much more watchable on weak mobile networks. The bitrate cap
+  // below adds to that: an uncapped encoder will try to push far more data
+  // than a long-distance/relay path can carry, which is what stalls or
+  // freezes video calls that go through several network hops. Capping it
+  // (lower still on a detected slow connection) keeps the stream smooth
+  // instead of fighting the network for bandwidth.
+  const videoSender = pc.getSenders().find(s => s.track?.kind === "video");
+  if (videoSender) {
+    const params = videoSender.getParameters();
+    params.degradationPreference = "balanced";
+    if (!params.encodings || !params.encodings.length) params.encodings = [{}];
+    const conn = navigator.connection || navigator.webkitConnection || navigator.mozConnection;
+    const slow = !!conn && ["slow-2g", "2g", "3g"].includes(conn.effectiveType || "");
+    params.encodings[0].maxBitrate = slow ? 300000 : opts.relayOnly ? 900000 : 1500000;
+    videoSender.setParameters(params).catch(() => {});
+  }
+
+  // Audio is far cheaper than video and matters more when bandwidth is
+  // tight — if it has to choose, the network should starve the picture
+  // before it starts cutting out speech.
+  const audioSender = pc.getSenders().find(s => s.track?.kind === "audio");
+  if (audioSender) {
+    const aparams = audioSender.getParameters();
+    if (!aparams.encodings || !aparams.encodings.length) aparams.encodings = [{}];
+    aparams.encodings[0].priority = "high";
+    aparams.encodings[0].networkPriority = "high";
+    audioSender.setParameters(aparams).catch(() => {});
   }
 
   let remoteStream = null;
@@ -1637,14 +1877,16 @@ function peer(caller) {
     if (state === "connected") {
       $("callState").textContent = "Connected";
       stopRing();
+      clearTimeout(iceFailTimer);
+      iceFailTimer = null;
       $("callAvatarWrap").classList.add("connected");
       if (!callConnectedAt) {
         startCallTimer(Date.now());
         setDoc(D("call_state", callId), { connectedAt: callConnectedAt }, { merge: true }).catch(console.warn);
       }
     } else if (state === "connecting") $("callState").textContent = "Connecting…";
-    else if (state === "disconnected") $("callState").textContent = "Connection interrupted";
-    else if (state === "failed") $("callState").textContent = "Connection failed";
+    else if (state === "disconnected") $("callState").textContent = "Reconnecting…";
+    else if (state === "failed") $("callState").textContent = "Reconnecting…";
     else if (state === "closed") $("callState").textContent = "Call ended";
   };
 
@@ -1655,12 +1897,49 @@ function peer(caller) {
     else if (state === "connected" || state === "completed") {
       $("callState").textContent = "Connected";
       stopRing();
+      clearTimeout(iceFailTimer);
+      iceFailTimer = null;
       $("callAvatarWrap").classList.add("connected");
       await playRemoteAudio();
-    } else if (state === "failed") {
-      $("callState").textContent = "Connection failed — retry call";
     } else if (state === "disconnected") {
-      $("callState").textContent = "Connection interrupted";
+      // "disconnected" often self-heals within a few seconds (a brief Wi-Fi
+      // blip, a network switch) — give it a moment before actively
+      // restarting ICE, and give up on the call only if it never recovers.
+      $("callState").textContent = "Reconnecting…";
+      clearTimeout(iceFailTimer);
+      iceFailTimer = setTimeout(() => {
+        if (pc && pc.iceConnectionState !== "connected" && pc.iceConnectionState !== "completed") {
+          attemptIceRestart();
+        }
+      }, 3000);
+    } else if (state === "failed") {
+      $("callState").textContent = "Reconnecting…";
+      attemptIceRestart();
+      // If a plain ICE restart hasn't recovered things after a few seconds,
+      // escalate once to a relay-only (TURN-forced) reconnect — that's what
+      // rescues calls across networks a normal STUN path can't cross
+      // (symmetric NAT, strict mobile/office firewalls). Only give up on
+      // the call after that has also had a chance to work.
+      clearTimeout(iceFailTimer);
+      iceFailTimer = setTimeout(() => {
+        if (!pc || pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed" || callEnded) return;
+        if (amCaller && !hardReconnectDone) {
+          attemptHardReconnect();
+          clearTimeout(iceFailTimer);
+          iceFailTimer = setTimeout(() => {
+            if (pc && pc.iceConnectionState !== "connected" && pc.iceConnectionState !== "completed" && !callEnded) {
+              $("callState").textContent = "Call failed — check your connection";
+              finishCall("failed");
+            }
+          }, 10000);
+        } else if (amCaller) {
+          $("callState").textContent = "Call failed — check your connection";
+          finishCall("failed");
+        }
+        // The callee doesn't give up on its own here — it waits for the
+        // caller's relay-only offer (applied above in watchCallState) or
+        // for the caller to end the call.
+      }, 8000);
     }
   };
 
@@ -1725,7 +2004,8 @@ async function mediaStream(video) {
   const videoConstraints = {
     facingMode: { ideal: "user" },
     width: { ideal: 1280, max: 1920 },
-    height: { ideal: 720, max: 1080 }
+    height: { ideal: 720, max: 1080 },
+    frameRate: { ideal: 30, max: 30 }
   };
 
   try {
@@ -1814,7 +2094,7 @@ async function start(video) {
   $("callName").textContent = cap(partnerId);
   $("callState").textContent = "Calling…";
   stopCallTimer();
-  $("speaker").textContent = "🔊 Speaker On";
+  $("speaker").querySelector(".callctrl-label").textContent = "Speaker On";
   speakerOn = true;
   setCallAvatar($("callAvatarImg"), $("callAvatarInitial"), partnerId);
   $("callAvatarWrap").classList.remove("connected");
@@ -1909,7 +2189,7 @@ async function acceptCall() {
   $("callName").textContent = cap(partnerId);
   $("callState").textContent = "Connecting…";
   stopCallTimer();
-  $("speaker").textContent = "🔊 Speaker On";
+  $("speaker").querySelector(".callctrl-label").textContent = "Speaker On";
   speakerOn = true;
   setCallAvatar($("callAvatarImg"), $("callAvatarInitial"), partnerId);
   $("callAvatarWrap").classList.remove("connected");
@@ -2126,7 +2406,7 @@ $("reject").onclick = async () => {
 $("end").onclick = async () => {
   await finishCall("ended");
 };
-$("mute").onclick = () => { const t = stream?.getAudioTracks()[0]; if (t) { t.enabled = !t.enabled; $("mute").textContent = t.enabled ? "🎙 Mute" : "🔇 Unmute"; $("mute").classList.toggle("active", !t.enabled); } };
+$("mute").onclick = () => { const t = stream?.getAudioTracks()[0]; if (t) { t.enabled = !t.enabled; $("mute").querySelector(".callctrl-label").textContent = t.enabled ? "Mute" : "Unmute"; $("mute").classList.toggle("active", !t.enabled); } };
 
 let speakerOn = true;
 $("speaker").onclick = async () => {
@@ -2134,14 +2414,14 @@ $("speaker").onclick = async () => {
   const remoteVideo = $("remote");
   remoteVideo.muted = !speakerOn;
   remoteVideo.volume = speakerOn ? 1 : 0;
-  $("speaker").textContent = speakerOn ? "🔊 Speaker On" : "🔈 Earpiece";
+  $("speaker").querySelector(".callctrl-label").textContent = speakerOn ? "Speaker On" : "Earpiece";
   $("speaker").classList.toggle("active", !speakerOn);
   if (speakerOn) {
     try { await remoteVideo.play(); } catch (e) { console.warn(e); }
   }
 };
 
-$("toggleVideo").onclick = () => { const t = stream?.getVideoTracks()[0]; if (t) { t.enabled = !t.enabled; $("toggleVideo").textContent = t.enabled ? "📹 Video On" : "🚫 Video Off"; $("toggleVideo").classList.toggle("active", !t.enabled); } };
+$("toggleVideo").onclick = () => { const t = stream?.getVideoTracks()[0]; if (t) { t.enabled = !t.enabled; $("toggleVideo").querySelector(".callctrl-label").textContent = t.enabled ? "Video On" : "Video Off"; $("toggleVideo").classList.toggle("active", !t.enabled); } };
 
 // Tap your own video preview during a video call to swap it to full screen.
 let localIsSwapped = false;
@@ -2205,6 +2485,58 @@ $("dpInput").onchange = e => {
   reader.readAsDataURL(file);
 };
 
+// Premium bubble gradient + text pairing for each built-in theme, tuned to
+// feel cohesive with that theme's chat background rather than one fixed look.
+const BUBBLE_THEMES = {
+  default: { sentFrom:"#0f766e", sentTo:"#14b8a6", sentColor:"#f0fdfa", recvBg:"#ffffff", recvColor:"#1f2937", recvBorder:"rgba(15,23,42,.06)" },
+  blue:    { sentFrom:"#1d4ed8", sentTo:"#3b82f6", sentColor:"#eff6ff", recvBg:"#ffffff", recvColor:"#1e293b", recvBorder:"rgba(30,64,175,.10)" },
+  green:   { sentFrom:"#15803d", sentTo:"#22c55e", sentColor:"#f0fdf4", recvBg:"#ffffff", recvColor:"#14532d", recvBorder:"rgba(21,128,61,.10)" },
+  pink:    { sentFrom:"#be185d", sentTo:"#ec4899", sentColor:"#fdf2f8", recvBg:"#ffffff", recvColor:"#831843", recvBorder:"rgba(190,24,93,.10)" },
+  purple:  { sentFrom:"#6d28d9", sentTo:"#a855f7", sentColor:"#faf5ff", recvBg:"#ffffff", recvColor:"#4c1d95", recvBorder:"rgba(109,40,217,.10)" },
+  dark:    { sentFrom:"#0f766e", sentTo:"#14b8a6", sentColor:"#f0fdfa", recvBg:"#374151", recvColor:"#f3f4f6", recvBorder:"rgba(255,255,255,.08)" }
+};
+
+// The top header bar (and the multi-select bar) get a matching gradient per
+// theme, so the whole chat — bubbles + header — feels like one designed set.
+const HEADER_THEMES = {
+  default: { from:"#075e54", mid:"#0f766e", to:"#0d9488", selFrom:"#134e4a", selMid:"#0f766e", selTo:"#115e59" },
+  blue:    { from:"#1e3a8a", mid:"#1d4ed8", to:"#2563eb", selFrom:"#172554", selMid:"#1d4ed8", selTo:"#1e40af" },
+  green:   { from:"#14532d", mid:"#15803d", to:"#16a34a", selFrom:"#052e16", selMid:"#15803d", selTo:"#166534" },
+  pink:    { from:"#831843", mid:"#be185d", to:"#db2777", selFrom:"#500724", selMid:"#be185d", selTo:"#9d174d" },
+  purple:  { from:"#4c1d95", mid:"#6d28d9", to:"#7c3aed", selFrom:"#2e1065", selMid:"#6d28d9", selTo:"#5b21b6" },
+  dark:    { from:"#111827", mid:"#1f2937", to:"#374151", selFrom:"#030712", selMid:"#1f2937", selTo:"#111827" }
+};
+
+// The "online" presence dot picks up a theme-matched bright accent instead
+// of always being plain green, so it reads as part of the same color story.
+const STATUS_THEMES = {
+  default: { dot:"#4ade80", glow:"rgba(74,222,128,.55)"  },
+  blue:    { dot:"#38bdf8", glow:"rgba(56,189,248,.55)"  },
+  green:   { dot:"#34d399", glow:"rgba(52,211,153,.55)"  },
+  pink:    { dot:"#fb7185", glow:"rgba(251,113,133,.55)" },
+  purple:  { dot:"#a78bfa", glow:"rgba(167,139,250,.55)" },
+  dark:    { dot:"#2dd4bf", glow:"rgba(45,212,191,.55)"  }
+};
+
+function hexToRgb(hex) {
+  hex = (hex || "#efeae2").replace("#", "");
+  if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
+  const num = parseInt(hex, 16) || 0;
+  return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+}
+// Shades a hex color toward black (negative percent) or white (positive percent).
+function shade(hex, percent) {
+  const { r, g, b } = hexToRgb(hex);
+  const t = percent < 0 ? 0 : 255;
+  const p = Math.abs(percent);
+  const mix = (c) => Math.round((t - c) * p) + c;
+  return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
+}
+function isLightColor(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 170;
+}
+
 function applyTheme(name, customColor = null) {
   const themes = {
     default: "#efeae2",
@@ -2218,7 +2550,65 @@ function applyTheme(name, customColor = null) {
   $("chat").style.background = bg;
   $("chat").dataset.theme = name || "custom";
   $("messages").style.color = name === "dark" ? "#fff" : "";
+
+  // Give the message bubbles a premium look that matches the chosen theme,
+  // instead of always staying the same fixed green/white pair.
+  let bt = BUBBLE_THEMES[name];
+  if (!bt) {
+    // Custom background: derive a matching sent-bubble gradient from the
+    // same hue (a darker and a lighter shade) rather than a hardcoded color.
+    const base = customColor || themes.default;
+    const light = isLightColor(base);
+    bt = {
+      sentFrom: shade(base, -0.32),
+      sentTo: shade(base, -0.05),
+      sentColor: "#ffffff",
+      recvBg: light ? "#ffffff" : "#f9fafb",
+      recvColor: "#1f2937",
+      recvBorder: "rgba(15,23,42,.08)"
+    };
+  }
+  const root = document.documentElement.style;
+  root.setProperty("--bubble-sent-bg", `linear-gradient(135deg,${bt.sentFrom},${bt.sentTo})`);
+  root.setProperty("--bubble-sent-color", bt.sentColor);
+  root.setProperty("--bubble-received-bg", bt.recvBg);
+  root.setProperty("--bubble-received-color", bt.recvColor);
+  root.setProperty("--bubble-received-border", bt.recvBorder);
+
+  // Header + select-bar gradient, matched to the same theme.
+  let ht = HEADER_THEMES[name];
+  if (!ht) {
+    // Custom background: build a rich header gradient from the same hue —
+    // darker for the row, darker still for the multi-select bar.
+    const base = customColor || themes.default;
+    ht = {
+      from: shade(base, -0.62), mid: shade(base, -0.42), to: shade(base, -0.50),
+      selFrom: shade(base, -0.75), selMid: shade(base, -0.42), selTo: shade(base, -0.65)
+    };
+  }
+  root.setProperty("--header-from", ht.from);
+  root.setProperty("--header-mid", ht.mid);
+  root.setProperty("--header-to", ht.to);
+  root.setProperty("--select-from", ht.selFrom);
+  root.setProperty("--select-mid", ht.selMid);
+  root.setProperty("--select-to", ht.selTo);
+
+  // Online status dot, matched to the same theme.
+  let st = STATUS_THEMES[name];
+  if (!st) {
+    // Custom background: a bright, saturated version of the same hue.
+    const base = customColor || themes.default;
+    const dot = shade(base, 0.35);
+    st = { dot, glow: dot.startsWith("rgb") ? dot.replace("rgb(", "rgba(").replace(")", ",.55)") : "rgba(74,222,128,.55)" };
+  }
+  root.setProperty("--status-online", st.dot);
+  root.setProperty("--status-online-glow", st.glow);
+
   localStorage.setItem("chat-theme", JSON.stringify({ name: name || "custom", color: bg }));
+  // A theme sets its own background; drop any older custom wallpaper pick
+  // (from the separate "Background color" option) so it can't silently
+  // override the theme's background again on the next reload.
+  localStorage.removeItem("chat-bg");
 }
 
 $("themeBtn").onclick = () => {
@@ -2247,6 +2637,9 @@ if (savedTheme) {
     const t = JSON.parse(savedTheme);
     applyTheme(t.name, t.color);
   } catch {}
+} else {
+  // First-time users start on the Rose theme instead of Classic.
+  applyTheme("pink");
 }
 $("bgBtn").onclick = () => { $("colors").classList.remove("hidden"); $("menu").classList.add("hidden"); };
 $("closeColors").onclick = () => $("colors").classList.add("hidden");

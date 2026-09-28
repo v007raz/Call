@@ -216,7 +216,7 @@ body{
 .date-sep{
   align-self:center;background:rgba(15,23,42,.55);color:#fff;font-size:11px;
   padding:4px 12px;border-radius:99px;margin:6px 0;box-shadow:0 2px 8px rgba(0,0,0,.12);
-  animation:popIn .3s var(--ease) both;backdrop-filter:blur(4px);
+  backdrop-filter:blur(4px);
 }
 
 .bubble{
@@ -224,8 +224,8 @@ body{
   border:1px solid rgba(0,0,0,.045);
   box-shadow:0 3px 12px rgba(15,23,42,.07)!important;
   transition:transform .22s var(--ease),box-shadow .22s var(--ease),filter .22s;
-  animation:messageIn .38s var(--ease) both;
 }
+.bubble.enter{animation:messageIn .38s var(--ease) both}
 .bubble:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(15,23,42,.10)!important}
 .sent{
   background:linear-gradient(145deg,#dcf8c6,#d3f4ba);
@@ -389,6 +389,20 @@ html.lite #composer,html.lite #replyBox,html.lite .modal,html.lite .date-sep{
   backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
 }
 html.lite #messages{background-image:none!important}
+
+
+/* Time + ticks pinned to the very bottom-right corner of the bubble */
+.bubble{padding-bottom:3px!important}
+.msg-meta{float:right;display:inline-flex;align-items:center;gap:3px;margin:9px 0 0 10px;line-height:1;letter-spacing:.01em;font-size:11px!important}
+.bubble > .msg-meta{float:none;display:flex;justify-content:flex-end;margin:2px 0 0}
+.msg-meta .tick-wrap{display:inline-flex;align-items:center;opacity:.9}
+.msg-meta .tick-wrap.text-blue-600 .tick{filter:drop-shadow(0 0 3px currentColor)}
+.msg-meta .tick{display:block;height:10px;width:auto;filter:drop-shadow(0 0 1px rgba(0,0,0,.18))}
+.bubble > div:has(> .msg-meta){display:flow-root}
+
+/* Tight message spacing */
+#messages{gap:0!important}
+#messages > div.p-1{padding-top:1px!important;padding-bottom:1px!important}
 html.lite #login:before,html.lite #login:after{display:none!important}
 html.lite .bubble,html.lite #app{box-shadow:none!important}
 
@@ -403,7 +417,7 @@ html.lite .bubble,html.lite #app{box-shadow:none!important}
   --bubble-received-shadow:0 2px 10px rgba(15,23,42,.08);
   --bubble-meta-sent:rgba(255,255,255,.82);
   --bubble-meta-received:#6b7280;
-  --bubble-tick-read:#a7f3d0;
+  --bubble-tick-read:#fde68a;
   --status-online:#fb7185;
   --status-online-glow:rgba(251,113,133,.55);
 }
@@ -731,7 +745,7 @@ function linkifyText(text) {
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { initializeAuth, inMemoryPersistence, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, addDoc, arrayUnion, writeBatch, deleteField, orderBy, limit, startAfter, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, addDoc, arrayUnion, writeBatch, deleteField, orderBy, limit, startAfter, getDocs, getDoc, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 const cfg = { apiKey: "AIzaSyDjryQAusSAnrF78wnL9ejTJUxwF5cZWMc", authDomain: "chatbox-6d13e.firebaseapp.com", projectId: "chatbox-6d13e", storageBucket: "chatbox-6d13e.firebasestorage.app", messagingSenderId: "8332958370", appId: "1:8332958370:web:96ad1a1fc48a00a26c15fb" };
 const app = initializeApp(cfg);
@@ -792,7 +806,10 @@ function valid(x) { return /^[a-z0-9_-]{2,40}$/.test(x); }
 // IDs are stored/compared lowercase internally; this only affects display.
 function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
-function render(s) {
+const TICK_SINGLE = '<svg class="tick" viewBox="0 0 18 11" width="14" height="9" aria-label="Sent"><path d="M1.5 5.9 4.9 9.3 12.3 1.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const TICK_DOUBLE = '<svg class="tick" viewBox="0 0 18 11" width="17" height="9" aria-label="Seen"><path d="M1.5 5.9 4.9 9.3 12.3 1.7M5.7 5.9 9.1 9.3 16.5 1.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+let lastRenderSig = "", animatedIds = new Set(), firstPaintDone = false;
+function render(s, fromListener) {
   const a = [];
   s.forEach(x => {
     // Firestore docs expose a .data() method; the optimistic "local only"
@@ -820,6 +837,14 @@ function render(s) {
     const ty = Number(y.timestamp) || 0;
     return tx - ty;
   });
+
+  // Skip pointless full rebuilds (e.g. the duplicate "pending write" + "server
+  // confirmed" snapshots, or presence-only changes) — they made the whole
+  // chat blink. Only rebuild when something visible actually changed.
+  const sig = a.map(m => [m.id, m.status, m.isEdited, m.isDeleted, (m.text || "").length, (m.image || "").length,
+    JSON.stringify(m.deletedFor || ""), JSON.stringify(m.reactions || "")].join("|")).join("\n");
+  if (fromListener && sig === lastRenderSig) return;
+  lastRenderSig = sig;
 
   // Cursor for "Load earlier messages": the oldest timestamp currently
   // known across the live window + any already-loaded older pages.
@@ -858,6 +883,18 @@ function render(s) {
     frag.append(loadBtn);
   }
 
+  // Snapchat-style: remember which messages I have SEEN (received ones I'm
+  // viewing now, and my sent ones the partner has read). They are cleared for
+  // me only when I leave the chat. Unseen messages are never touched.
+  a.forEach(m => {
+    if (document.hidden || m.isDeleted) return; // not looking = not seen
+    const df = Array.isArray(m.deletedFor) ? m.deletedFor : [];
+    const seen = m.senderId !== myId || m.status === "read";
+    if (!seen) return;
+    if (df.includes(myId) && !df.includes(partnerId)) return; // already cleared for me
+    seenToPurge.set(m.id, df.includes(partnerId));
+  });
+
   a.forEach(m => {
     // Only hide a message when deletedFor is a real array containing myId.
     // This prevents malformed/missing deletedFor data from hiding messages.
@@ -888,10 +925,12 @@ function render(s) {
     r.dataset.mid = m.id;
 
     const b = document.createElement("div");
+    const isNewBubble = firstPaintDone && !animatedIds.has(m.id);
+    animatedIds.add(m.id);
     b.className =
       "bubble " +
       (m.senderId === myId ? "sent" : "received") +
-      " shadow-sm cursor-pointer";
+      " shadow-sm cursor-pointer" + (isNewBubble ? " enter" : "");
     b.dataset.mid = m.id;
 
     if (m.replyTo) {
@@ -959,7 +998,7 @@ function render(s) {
 
     const f = document.createElement("small");
     f.className =
-      "inline-flex items-center gap-1 text-gray-500 ml-2 align-baseline whitespace-nowrap text-[10px]";
+      "msg-meta text-gray-500 whitespace-nowrap text-[10px]";
 
     const time = Number(m.timestamp);
     const timeText = Number.isFinite(time) && time > 0
@@ -973,12 +1012,11 @@ function render(s) {
     f.innerHTML =
       timeText +
       (m.senderId === myId
-        ? " " +
-          (m.status === "read"
-            ? "<span class='text-blue-600'>✓✓</span>"
+        ? (m.status === "read"
+            ? "<span class='tick-wrap text-blue-600'>" + TICK_DOUBLE + "</span>"
             : m.status === "delivered"
-            ? "✓✓"
-            : "✓")
+            ? "<span class='tick-wrap'>" + TICK_DOUBLE + "</span>"
+            : "<span class='tick-wrap'>" + TICK_SINGLE + "</span>")
         : "");
 
     if (m.image && !m.text) {
@@ -1107,9 +1145,11 @@ function render(s) {
     ) {
       toMarkRead.push(m.id);
     }
+
   });
 
   box.replaceChildren(frag);
+  firstPaintDone = true;
 
   // One batched write for every newly-read message instead of a separate
   // round-trip per message — fewer writes means fewer follow-up snapshot
@@ -1129,6 +1169,100 @@ function render(s) {
     });
   }
 }
+
+// ---------- Snapchat-style auto-clear (works on the free Spark plan) ----------
+// When a user LEAVES the chat, the messages they have already seen are
+// cleared for THEM only (added to deletedFor). Unseen messages stay. Once
+// both users have cleared a message, the Firestore document is deleted for
+// good. No Cloud Functions / TTL / Blaze plan needed.
+const seenToPurge = new Map(); // messageId -> did the partner already clear it?
+let purging = false;
+
+async function clearMessages(entries) {
+  // entries: [[id, partnerAlreadyCleared], ...]
+  const ref = id => doc(C("chat_" + room), id);
+  try {
+    for (let i = 0; i < entries.length; i += 400) {
+      const batch = writeBatch(db);
+      entries.slice(i, i + 400).forEach(([id, done]) =>
+        done ? batch.delete(ref(id)) : batch.update(ref(id), { deletedFor: arrayUnion(myId) }));
+      await batch.commit();
+    }
+  } catch (e) {
+    // A doc may have just been deleted by the partner — retry one by one.
+    await Promise.allSettled(entries.map(([id, done]) =>
+      done ? deleteDoc(ref(id)) : updateDoc(ref(id), { deletedFor: arrayUnion(myId) })));
+  }
+}
+
+// Mobile browsers can freeze a tab before the delete request finishes, so the
+// list of seen messages is also saved locally (synchronous, always works) and
+// finished on the next app open.
+const pendingKey = () => "pendingClear_" + myId + "_" + room;
+function savePending() {
+  if (!room || !seenToPurge.size) return;
+  try { localStorage.setItem(pendingKey(), JSON.stringify([...seenToPurge])); } catch {}
+}
+function clearPending() { try { localStorage.removeItem(pendingKey()); } catch {} }
+
+async function purgeSeen() {
+  if (!room || purging || !seenToPurge.size) return;
+  purging = true;
+  const entries = [...seenToPurge];
+  try {
+    await clearMessages(entries);
+    entries.forEach(([id]) => { seenToPurge.delete(id); olderMessages.delete(id); });
+    clearPending();
+  } catch (e) {
+    console.warn("Auto-clear failed (will retry on next open):", e);
+  } finally {
+    purging = false;
+  }
+}
+
+// On app open: finish anything a closed/frozen tab could not complete.
+// Equality / array-contains on one or two fields, so no composite index.
+async function sweepSeen() {
+  try {
+    // 0) leftovers from a previous session that was closed mid-clear
+    const raw = localStorage.getItem(pendingKey());
+    if (raw) {
+      const saved = JSON.parse(raw);
+      if (Array.isArray(saved) && saved.length) await clearMessages(saved);
+      clearPending();
+    }
+    const entries = [];
+    // Messages the partner cleared that I had already cleared too
+    const both = await getDocs(query(C("chat_" + room), where("deletedFor", "array-contains", partnerId)));
+    both.forEach(d => {
+      const df = Array.isArray(d.data().deletedFor) ? d.data().deletedFor : [];
+      if (df.includes(myId) && !entries.some(e => e[0] === d.id)) entries.push([d.id, true]);
+    });
+    if (entries.length) await clearMessages(entries);
+  } catch (e) {
+    console.warn("Sweep failed:", e);
+  }
+}
+
+// "Leaving" = closing/refreshing the tab, or staying away from the app for a
+// full minute (locking the phone, another app, another tab). Quick switches
+// (gallery picker, peeking at another tab) never clear anything. Only the
+// person who leaves gets THEIR view cleared; the partner's chat is untouched.
+const LEAVE_AFTER_MS = 60000;
+let hiddenAt = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    hiddenAt = Date.now();
+    savePending(); // survives even if the browser freezes/kills the tab
+  } else {
+    const away = hiddenAt ? Date.now() - hiddenAt : 0;
+    hiddenAt = 0;
+    if (away >= LEAVE_AFTER_MS) purgeSeen(); // really left: clear what was seen before leaving
+    else clearPending();                      // just a quick switch: keep everything
+    if (lastLiveSnap) render(lastLiveSnap);
+  }
+});
+window.addEventListener("pagehide", () => { savePending(); purgeSeen(); });
 
 async function loadOlderMessages() {
   if (loadingOlder || noMoreOlder || !room || earliestLoadedTs == null) return;
@@ -1380,7 +1514,7 @@ function setup() {
       // If the very first sync already comes back under a full page, the
       // whole history fits in this window — no older page will ever exist.
       if (!noMoreOlder && olderMessages.size === 0 && snap.size < PAGE_SIZE) noMoreOlder = true;
-      render(snap);
+      render(snap, true);
     },
     e => {
       console.error("Chat sync failed:", e);
@@ -1389,6 +1523,7 @@ function setup() {
   );
   presence();
   listenIncoming();
+  sweepSeen();
 }
 
 function listenIncoming() {
@@ -2501,12 +2636,12 @@ $("dpInput").onchange = e => {
 // Premium bubble gradient + text pairing for each built-in theme, tuned to
 // feel cohesive with that theme's chat background rather than one fixed look.
 const BUBBLE_THEMES = {
-  default: { sentFrom:"#0f766e", sentTo:"#14b8a6", sentColor:"#f0fdfa", recvBg:"#ffffff", recvColor:"#1f2937", recvBorder:"rgba(15,23,42,.06)" },
-  blue:    { sentFrom:"#1d4ed8", sentTo:"#3b82f6", sentColor:"#eff6ff", recvBg:"#ffffff", recvColor:"#1e293b", recvBorder:"rgba(30,64,175,.10)" },
-  green:   { sentFrom:"#15803d", sentTo:"#22c55e", sentColor:"#f0fdf4", recvBg:"#ffffff", recvColor:"#14532d", recvBorder:"rgba(21,128,61,.10)" },
-  pink:    { sentFrom:"#be185d", sentTo:"#ec4899", sentColor:"#fdf2f8", recvBg:"#ffffff", recvColor:"#831843", recvBorder:"rgba(190,24,93,.10)" },
-  purple:  { sentFrom:"#6d28d9", sentTo:"#a855f7", sentColor:"#faf5ff", recvBg:"#ffffff", recvColor:"#4c1d95", recvBorder:"rgba(109,40,217,.10)" },
-  dark:    { sentFrom:"#0f766e", sentTo:"#14b8a6", sentColor:"#f0fdfa", recvBg:"#374151", recvColor:"#f3f4f6", recvBorder:"rgba(255,255,255,.08)" }
+  default: { tick:"#fcd34d", sentFrom:"#0f766e", sentTo:"#14b8a6", sentColor:"#f0fdfa", recvBg:"#ffffff", recvColor:"#1f2937", recvBorder:"rgba(15,23,42,.06)" },
+  blue:    { tick:"#67e8f9", sentFrom:"#1d4ed8", sentTo:"#3b82f6", sentColor:"#eff6ff", recvBg:"#ffffff", recvColor:"#1e293b", recvBorder:"rgba(30,64,175,.10)" },
+  green:   { tick:"#fde047", sentFrom:"#15803d", sentTo:"#22c55e", sentColor:"#f0fdf4", recvBg:"#ffffff", recvColor:"#14532d", recvBorder:"rgba(21,128,61,.10)" },
+  pink:    { tick:"#fde68a", sentFrom:"#be185d", sentTo:"#ec4899", sentColor:"#fdf2f8", recvBg:"#ffffff", recvColor:"#831843", recvBorder:"rgba(190,24,93,.10)" },
+  purple:  { tick:"#f0abfc", sentFrom:"#6d28d9", sentTo:"#a855f7", sentColor:"#faf5ff", recvBg:"#ffffff", recvColor:"#4c1d95", recvBorder:"rgba(109,40,217,.10)" },
+  dark:    { tick:"#5eead4", sentFrom:"#0f766e", sentTo:"#14b8a6", sentColor:"#f0fdfa", recvBg:"#374151", recvColor:"#f3f4f6", recvBorder:"rgba(255,255,255,.08)" }
 };
 
 // The top header bar (and the multi-select bar) get a matching gradient per
@@ -2576,6 +2711,7 @@ function applyTheme(name, customColor = null) {
       sentFrom: shade(base, -0.32),
       sentTo: shade(base, -0.05),
       sentColor: "#ffffff",
+      tick: shade(base, 0.6),
       recvBg: light ? "#ffffff" : "#f9fafb",
       recvColor: "#1f2937",
       recvBorder: "rgba(15,23,42,.08)"
@@ -2584,6 +2720,7 @@ function applyTheme(name, customColor = null) {
   const root = document.documentElement.style;
   root.setProperty("--bubble-sent-bg", `linear-gradient(135deg,${bt.sentFrom},${bt.sentTo})`);
   root.setProperty("--bubble-sent-color", bt.sentColor);
+  root.setProperty("--bubble-tick-read", bt.tick);
   root.setProperty("--bubble-received-bg", bt.recvBg);
   root.setProperty("--bubble-received-color", bt.recvColor);
   root.setProperty("--bubble-received-border", bt.recvBorder);

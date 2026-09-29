@@ -3309,8 +3309,7 @@ onAuthStateChanged(auth, u => {
       }
     }
     const mid=document.getElementById("myId"),pid=document.getElementById("partnerId"),btn=document.getElementById("connect");
-    pid.value=localStorage.getItem("whatsapp_partner_id")||"";
-    btn.addEventListener("click",()=>{const v=pid.value.trim().toLowerCase();if(v)localStorage.setItem("whatsapp_partner_id",v)});
+    btn.addEventListener("click",()=>{const v=pid.value.trim().toLowerCase();});
     mid.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();pid.focus()}});
     pid.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();if(!btn.disabled&&!btn.classList.contains("is-loading"))btn.click()}});
     const st=document.getElementById("loginStatus");

@@ -628,6 +628,70 @@ html .flower,html.lite .flower,html.lite .login-petals .flower{
   animation-duration:var(--dur,10s)!important;animation-iteration-count:infinite!important}}
 html.lite .flower{filter:none!important}
 </style>
+<style id="header-fit">
+/* ---- Header: always one row, text scales per screen/browser ---- */
+#chatHeader{display:flex;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:8px;
+  padding-left:max(10px,env(safe-area-inset-left,0px))!important;padding-right:max(10px,env(safe-area-inset-right,0px))!important}
+#chatHeader>div:first-child{flex:1 1 0;min-width:0;gap:10px}
+#chatHeader>div:first-child>div{flex:1 1 auto;min-width:0}
+#dpBtn{flex-shrink:0;width:clamp(36px,10.5vw,44px);height:clamp(36px,10.5vw,44px)}
+#partnerName{display:block;font-size:clamp(14px,4.3vw,17px);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#status{display:flex;align-items:center;min-width:0;max-width:100%;font-size:clamp(10.5px,3.1vw,12.5px);line-height:1.3;margin-top:1px}
+#statusText{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#statusDot{width:8px;height:8px;margin-right:6px}
+#chatHeader>div:last-child{flex:0 0 auto;gap:clamp(6px,2vw,10px)}
+#callWrap{display:flex}
+.call-icon-btn,#scrollBottom,#menuBtn{width:clamp(34px,9.6vw,40px);height:clamp(34px,9.6vw,40px)}
+.call-icon-btn{position:relative}
+.call-badge{position:absolute;right:5px;bottom:5px;opacity:.95;filter:drop-shadow(0 0 2px rgba(0,0,0,.35))}
+#callBtn[aria-expanded="true"]{background:rgba(255,255,255,.3)}
+/* call popover */
+#callMenu{position:absolute;right:0;top:calc(100% + 10px);z-index:30;min-width:11.5rem;overflow:hidden;border-radius:16px;
+  background:rgba(255,255,255,.97);color:#1f2937;box-shadow:0 18px 50px rgba(0,0,0,.28);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);animation:menuPop .16s var(--ease)}
+#callMenu.hidden{display:none}
+.call-opt{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;font-size:14.5px;font-weight:600;text-align:left;
+  background:transparent;color:#1f2937;border:0}
+.call-opt+.call-opt{border-top:1px solid rgba(15,23,42,.07)}
+.call-opt svg{color:var(--accent);flex-shrink:0}
+.call-opt:hover,.call-opt:focus-visible{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+@keyframes menuPop{from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:none}}
+@media (max-width:340px){#chatHeader{gap:6px}#chatHeader>div:first-child{gap:8px}}
+#callBtn{width:auto;padding:0 clamp(9px,2.8vw,13px);border-radius:999px;gap:0}
+#callBtn .call-half{position:static;flex:1 1 0;width:clamp(17px,5vw,20px);height:clamp(17px,5vw,20px);filter:none}
+#callBtn .call-half+.call-half{margin-left:clamp(6px,2vw,9px);padding-left:clamp(6px,2vw,9px);box-sizing:content-box;border-left:1px solid rgba(255,255,255,.35)}
+</style>
+<style id="pill-requests">
+#newMsgWrap{position:relative;height:0;z-index:15;flex-shrink:0}
+#newMsgPill{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;white-space:nowrap;
+  padding:8px 14px 8px 11px;border-radius:999px;font-size:13px;font-weight:700;color:#fff;border:0;
+  background:var(--accent);box-shadow:0 8px 22px rgba(0,0,0,.25);animation:pillIn .22s var(--ease)}
+#newMsgPill:active:not(:disabled){transform:translateX(-50%) scale(.95)}
+#newMsgPill.hidden{display:none}
+@keyframes pillIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+#menuDot{position:absolute;top:5px;right:5px;width:9px;height:9px;border-radius:50%;background:#ef4444;border:1.5px solid #fff}
+#menuDot.hidden{display:none}
+#reqCount{min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:#ef4444;color:#fff;font-size:11px;font-weight:700;line-height:20px;text-align:center}
+#reqCount.hidden{display:none}
+#requestsModal{position:absolute;inset:0;z-index:60;display:flex;align-items:flex-end;background:rgba(15,23,42,.45)}
+#requestsModal.hidden{display:none}
+.req-sheet{width:100%;max-height:75%;display:flex;flex-direction:column;background:#fff;color:#1f2937;border-radius:22px 22px 0 0;
+  padding-bottom:env(safe-area-inset-bottom,0px);animation:sheetUp .28s var(--ease)}
+.req-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 10px;font-size:16px}
+.req-head button{width:32px;height:32px;border-radius:50%;background:#f1f5f9;color:#475569}
+#requestsList{overflow-y:auto;padding:0 12px 14px}
+.req-empty{padding:28px 12px;text-align:center;font-size:14px;color:#64748b}
+.req-row{display:flex;align-items:center;gap:12px;padding:10px 6px;border-top:1px solid rgba(15,23,42,.06)}
+.req-av{width:42px;height:42px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;background:var(--accent)}
+.req-txt{flex:1 1 auto;min-width:0}
+.req-txt b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.req-txt span{display:block;font-size:12.5px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.req-go{flex-shrink:0;padding:8px 16px;border-radius:99px;font-size:13px;font-weight:700;color:#fff;background:var(--accent)}
+.req-x{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:#f1f5f9;color:#64748b}
+#reqToast{position:absolute;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top,0px));z-index:70;padding:12px 14px;border-radius:14px;
+  background:#111827;color:#fff;font-size:13.5px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.35);animation:menuPop .2s var(--ease)}
+#reqToast.hidden{display:none}
+</style>
 </head>
 <body>
 <script>
@@ -665,7 +729,7 @@ html.lite .flower{filter:none!important}
       <div class="login-mark"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/><circle cx="12" cy="15.2" r="1.1" fill="#fff" stroke="none"/></svg></div>
       <h1>Secure Cloud</h1>
       <p>Our Secure Network.</p>
-      <div class="login-chips"><span>💬 Private Chat</span><span>📞 Calls</span><span>🖼️ Media</span></div>
+      <div class="login-chips"><span>Radhakrishna</span><span>Love</span><span>Friend</span></div>
     </div>
     <div class="login-sheet">
       <div class="login-grab" aria-hidden="true"></div>
@@ -678,6 +742,13 @@ html.lite .flower{filter:none!important}
     </div>
   </section>
 
+  <div id="requestsModal" class="hidden" role="dialog" aria-modal="true" aria-label="Chat requests">
+    <div class="req-sheet">
+      <div class="req-head"><b>Chat requests</b><button id="requestsClose" type="button" aria-label="Close">✕</button></div>
+      <div id="requestsList"></div>
+    </div>
+  </div>
+  <div id="reqToast" class="hidden" role="status"></div>
   <section id="chat" class="screen hidden flex flex-col" style="background:#fce7f3">
     <div id="selectBar" class="hidden bg-teal-800 text-white p-3 flex justify-between items-center relative z-10">
       <div class="flex items-center gap-3 min-w-0">
@@ -701,22 +772,33 @@ html.lite .flower{filter:none!important}
         </div>
       </div>
       <div class="flex items-center gap-3 relative">
-        <button id="audioCall" class="call-icon-btn" title="Voice call" aria-label="Voice call">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.01l-2.2 2.21z"/></svg>
-        </button>
-        <button id="videoCall" class="call-icon-btn" title="Video call" aria-label="Video call">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h9A1.5 1.5 0 0 1 15 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 3 16.5v-9Z"/><path d="M16.5 10.2 20.3 7.7c.44-.3 1.03.02 1.03.55v7.5c0 .53-.59.85-1.03.55l-3.8-2.5v-3.6Z"/></svg>
-        </button>
-        <button id="scrollBottom" class="relative" title="Latest messages" aria-label="Latest messages"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9.5l6 6 6-6"/></svg><span id="unreadBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] leading-none rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">0</span></button>
-        <button id="menuBtn" aria-label="Menu"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="18.5" r="1.7"/></svg></button>
+        <div id="callWrap" class="relative">
+          <button id="callBtn" type="button" class="call-icon-btn" title="Call" aria-label="Call options" aria-haspopup="menu" aria-expanded="false">
+            <svg class="call-half" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.01l-2.2 2.21z"/></svg>
+            <svg class="call-half" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h9A1.5 1.5 0 0 1 15 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 3 16.5v-9Z"/><path d="M16.5 10.2 20.3 7.7c.44-.3 1.03.02 1.03.55v7.5c0 .53-.59.85-1.03.55l-3.8-2.5v-3.6Z"/></svg>
+          </button>
+          <div id="callMenu" class="hidden" role="menu" aria-label="Call options">
+            <button id="audioCall" type="button" role="menuitem" class="call-opt">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.01l-2.2 2.21z"/></svg>
+              <span>Voice call</span>
+            </button>
+            <button id="videoCall" type="button" role="menuitem" class="call-opt">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h9A1.5 1.5 0 0 1 15 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 3 16.5v-9Z"/><path d="M16.5 10.2 20.3 7.7c.44-.3 1.03.02 1.03.55v7.5c0 .53-.59.85-1.03.55l-3.8-2.5v-3.6Z"/></svg>
+              <span>Video call</span>
+            </button>
+          </div>
+        </div>
+        <button id="menuBtn" style="position:relative" aria-label="Menu"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="18.5" r="1.7"/></svg><span id="menuDot" class="hidden"></span></button>
         <div id="menu" class="hidden absolute right-0 top-12 bg-white text-gray-800 w-48 z-20 shadow rounded">
            <button id="clearChat" class="block w-full text-left p-3 border-b text-red-600 font-bold">Clear chat</button>
+          <button id="requestsBtn" class="flex items-center justify-between w-full text-left p-3 border-b font-semibold"><span>Requests</span><span id="reqCount" class="hidden">0</span></button>
           <button id="themeBtn" class="block w-full text-left p-3">Chat theme</button>
           <button id="bgBtn" class="block w-full text-left p-3">Background color</button>
         </div>
       </div>
     </header>
     <main id="messages" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2"></main>
+    <div id="newMsgWrap" aria-live="polite"><button id="newMsgPill" type="button" class="hidden"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9.5l6 6 6-6"/></svg><span id="newMsgText">New message</span></button></div>
     <div id="replyBox" class="hidden text-sm flex justify-between items-center" aria-live="polite">
       <div>
         <span class="text-[10px] text-teal-700 font-bold block">Replying to</span>
@@ -1645,6 +1727,7 @@ async function send(imgData = null) {
     // Fire-and-forget: UI is not blocked by Firestore round-trip.
     rt(() => set(ref(rtdb, msgPath(id)), clean(d))).then(() => {
       localMessages.delete(id);
+      notifyRequest(d.text || (d.image ? "📷 Photo" : ""));
     }).catch(e => {
       console.error("Message send failed", e);
       const m = localMessages.get(id);
@@ -1691,10 +1774,26 @@ function renderPresence() {
   const isTyping = isOnline && !!d.typing;
   $("statusText").textContent = isTyping ? "typing…" : isOnline ? "Online" : formatLastSeen(d && d.lastSeen);
   $("statusDot").className = isTyping ? "typing" : isOnline ? "online" : "";
+  fitStatus();
 }
 
+// If the "last seen ..." line doesn't fit this screen/browser, use a shorter wording
+// instead of wrapping to a 2nd line (header always stays a single row).
+function fitStatus() {
+  const el = $("statusText");
+  if (!el || !el.textContent) return;
+  const full = el.textContent;
+  if (el.scrollWidth <= el.clientWidth + 1) return;
+  const short = full.replace(/^last seen on /, "").replace(/^last seen /, "seen ").replace(" at ", " ");
+  el.textContent = short;
+  el.title = full;
+}
+window.addEventListener("resize", () => { try { renderPresence(); } catch (e) {} });
+
+let presenceBound = false;
 function presence() {
   const me = PR(myId);
+  unPresence?.(); unPresence = null;
   const goOnline = () => update(me, { online: true, lastSeen: serverTimestamp() }).catch(console.warn);
   const goOffline = () => update(me, { online: false, typing: false, lastSeen: serverTimestamp() }).catch(() => {});
 
@@ -1702,7 +1801,7 @@ function presence() {
     // Fires on first connect AND on every reconnect. The server runs the onDisconnect
     // write by itself when the connection dies (tab closed, net lost, phone locked),
     // so there is NO 5s heartbeat and no per-write quota.
-    onValue(ref(rtdb, ".info/connected"), snap => {
+    if (!presenceBound) onValue(ref(rtdb, ".info/connected"), snap => {
       if (snap.val() !== true) return;
       onDisconnect(me).update({ online: false, typing: false, lastSeen: serverTimestamp() })
         .then(goOnline).catch(console.warn);
@@ -1713,15 +1812,18 @@ function presence() {
     }, e => console.warn("Presence listen failed", e));
   });
 
-  document.addEventListener("visibilitychange", () => {
-    if (myId && !document.hidden) presenceReady.then(goOnline);
-  });
-  window.addEventListener("pageshow", () => { if (myId) presenceReady.then(goOnline); });
-  window.addEventListener("pagehide", () => {
-    if (!myId) return;
-    typingIsOn = false;
-    goOffline();
-  });
+  if (!presenceBound) {
+    presenceBound = true;
+    document.addEventListener("visibilitychange", () => {
+      if (myId && !document.hidden) presenceReady.then(goOnline);
+    });
+    window.addEventListener("pageshow", () => { if (myId) presenceReady.then(goOnline); });
+    window.addEventListener("pagehide", () => {
+      if (!myId) return;
+      typingIsOn = false;
+      goOffline();
+    });
+  }
 
   // Re-render every 5s (local only, free) so "last seen" text keeps counting up.
   clearInterval(lastSeenRefreshTimer);
@@ -1796,6 +1898,7 @@ function setup() {
   });
   presence();
   listenIncoming();
+  listenRequests();
   sweepSeen();
 }
 
@@ -1873,12 +1976,13 @@ let seenMessageIds = new Set();
 let unreadCount = 0;
 let renderedOnce = false;
 function updateUnreadBadge() {
-  const badge = $("unreadBadge");
+  const pill = $("newMsgPill");
+  if (!pill) return;
   if (unreadCount > 0) {
-    badge.textContent = unreadCount > 99 ? "99+" : String(unreadCount);
-    badge.classList.remove("hidden");
+    $("newMsgText").textContent = unreadCount === 1 ? "1 new message" : (unreadCount > 99 ? "99+" : unreadCount) + " new messages";
+    pill.classList.remove("hidden");
   } else {
-    badge.classList.add("hidden");
+    pill.classList.add("hidden");
   }
 }
 let callConnectedAt = 0;
@@ -2853,12 +2957,140 @@ $("local").addEventListener("click", () => {
 });
 
 function scrollToLatest(smooth=true){ const box=$("messages"); box.scrollTo({top:box.scrollHeight, behavior:smooth?"smooth":"auto"}); }
-function updateScrollButton(){ const box=$("messages"); const away=box.scrollHeight-box.scrollTop-box.clientHeight>180; $("scrollBottom").style.opacity=away?"1":".45"; if(!away){ unreadCount=0; updateUnreadBadge(); } }
+function updateScrollButton(){ const box=$("messages"); const away=box.scrollHeight-box.scrollTop-box.clientHeight>180; if(!away){ unreadCount=0; updateUnreadBadge(); } }
 $("messages").addEventListener("scroll", updateScrollButton, {passive:true});
-$("scrollBottom").onclick=()=>{ unreadCount=0; updateUnreadBadge(); scrollToLatest(true); };
+$("newMsgPill").onclick=()=>{ unreadCount=0; updateUnreadBadge(); scrollToLatest(true); };
 $("emojiBtn").onclick=()=>$("emojiTray").classList.toggle("hidden");
 $("emojiTray").addEventListener("click", e=>{ const emoji=e.target.textContent.trim(); if(!emoji) return; const i=$("message"); const start=i.selectionStart ?? i.value.length, end=i.selectionEnd ?? i.value.length; i.value=i.value.slice(0,start)+emoji+i.value.slice(end); i.focus(); i.selectionStart=i.selectionEnd=start+emoji.length; });
-$("menuBtn").onclick = () => $("menu").classList.toggle("hidden");
+
+// ---------- Chat requests: someone else's ID messaged me -> connect to them in one tap ----------
+const reqKey = (from, to) => from + "~" + to;
+const reqSentAt = new Map();
+let requests = new Map(), unRequests = null, reqReady = false, reqToastTimer = null;
+
+// Called after I send a message: leave a small "request" for the partner's inbox
+// (throttled to once per 90s per partner so it costs almost nothing).
+function notifyRequest(preview) {
+  const now = Date.now();
+  if (now - (reqSentAt.get(room) || 0) < 90000) return;
+  reqSentAt.set(room, now);
+  setDoc(D("chat_requests", reqKey(myId, partnerId)), {
+    from: myId, to: partnerId, timestamp: now, preview: String(preview || "").slice(0, 60)
+  }).catch(e => console.warn("Request notify failed", e));
+}
+
+function listenRequests() {
+  unRequests?.();
+  reqReady = false;
+  requests = new Map();
+  renderRequests();
+  unRequests = onSnapshot(query(C("chat_requests"), where("to", "==", myId)), snap => {
+    const next = new Map();
+    snap.forEach(d => {
+      const v = d.data();
+      if (!v || !v.from || v.from === myId) return;
+      if (v.from === partnerId) { deleteDoc(d.ref).catch(() => {}); return; } // already chatting with them
+      next.set(v.from, v);
+    });
+    if (reqReady) {
+      next.forEach((v, k) => {
+        const old = requests.get(k);
+        if (!old || Number(v.timestamp) > Number(old.timestamp)) showReqToast(k);
+      });
+    }
+    requests = next;
+    reqReady = true;
+    renderRequests();
+  }, e => console.warn("Requests listener failed", e));
+}
+
+function showReqToast(from) {
+  const t = $("reqToast");
+  t.textContent = cap(from) + " ne aapko message kiya — Menu › Requests me dekhein";
+  t.classList.remove("hidden");
+  playNotifySound();
+  clearTimeout(reqToastTimer);
+  reqToastTimer = setTimeout(() => t.classList.add("hidden"), 4500);
+}
+
+function timeAgo(ts) {
+  const m = Math.floor((Date.now() - Number(ts || 0)) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return m + " min ago";
+  if (m < 1440) return Math.floor(m / 60) + " h ago";
+  return Math.floor(m / 1440) + " d ago";
+}
+
+function renderRequests() {
+  const n = requests.size;
+  $("menuDot").classList.toggle("hidden", n === 0);
+  $("reqCount").classList.toggle("hidden", n === 0);
+  $("reqCount").textContent = String(n);
+  const list = $("requestsList");
+  list.textContent = "";
+  if (!n) {
+    const e = document.createElement("div");
+    e.className = "req-empty";
+    e.textContent = "Abhi koi request nahi hai.";
+    list.append(e);
+    return;
+  }
+  [...requests.values()].sort((a, b) => Number(b.timestamp) - Number(a.timestamp)).forEach(v => {
+    const row = document.createElement("div"); row.className = "req-row";
+    const av = document.createElement("div"); av.className = "req-av"; av.textContent = (v.from[0] || "?").toUpperCase();
+    const tx = document.createElement("div"); tx.className = "req-txt";
+    const nm = document.createElement("b"); nm.textContent = cap(v.from);
+    const pv = document.createElement("span"); pv.textContent = (v.preview || "New message") + " · " + timeAgo(v.timestamp);
+    tx.append(nm, pv);
+    const go = document.createElement("button"); go.type = "button"; go.className = "req-go"; go.textContent = "Connect";
+    go.onclick = () => connectTo(v.from);
+    const x = document.createElement("button"); x.type = "button"; x.className = "req-x"; x.textContent = "✕"; x.setAttribute("aria-label", "Dismiss");
+    x.onclick = () => deleteDoc(D("chat_requests", reqKey(v.from, myId))).catch(() => {});
+    row.append(av, tx, go, x);
+    list.append(row);
+  });
+}
+
+function switchPartner(id) {
+  if (!id || id === partnerId) return;
+  unChat?.(); unChat = null;
+  localMessages.clear(); seenMessageIds.clear(); olderMessages.clear(); animatedIds.clear();
+  lastLiveSnap = null; earliestLoadedTs = null; loadingOlder = false; noMoreOlder = false;
+  lastRenderSig = ""; renderedOnce = false; firstPaintDone = false; unreadCount = 0;
+  lastPartnerPresence = null; replyTo = null; editing = null;
+  $("messages").textContent = "";
+  try { hideReplyBubble(); } catch (e) {}
+  updateUnreadBadge(); updateSendState();
+  $("partnerId").value = id;
+  setup();
+}
+
+function connectTo(id) {
+  closeRequests();
+  deleteDoc(D("chat_requests", reqKey(id, myId))).catch(() => {});
+  switchPartner(id);
+}
+function openRequests() { $("menu").classList.add("hidden"); renderRequests(); $("requestsModal").classList.remove("hidden"); }
+function closeRequests() { $("requestsModal").classList.add("hidden"); }
+$("requestsBtn").onclick = openRequests;
+$("requestsClose").onclick = closeRequests;
+$("requestsModal").addEventListener("click", e => { if (e.target === $("requestsModal")) closeRequests(); });
+$("reqToast").onclick = () => { $("reqToast").classList.add("hidden"); openRequests(); };
+
+function closeCallMenu() { $("callMenu").classList.add("hidden"); $("callBtn").setAttribute("aria-expanded", "false"); }
+$("menuBtn").onclick = e => { e.stopPropagation(); closeCallMenu(); $("menu").classList.toggle("hidden"); };
+$("callBtn").onclick = e => {
+  e.stopPropagation();
+  $("menu").classList.add("hidden");
+  const open = $("callMenu").classList.toggle("hidden") === false;
+  $("callBtn").setAttribute("aria-expanded", String(open));
+};
+$("callMenu").addEventListener("click", closeCallMenu);
+document.addEventListener("click", e => {
+  if (!e.target.closest("#callWrap")) closeCallMenu();
+  if (!e.target.closest("#menu") && !e.target.closest("#menuBtn")) $("menu").classList.add("hidden");
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeCallMenu(); $("menu").classList.add("hidden"); } });
 
 $("dpBtn").onclick = () => {
   const src = $("partnerDp").src;

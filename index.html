@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(self)">
-<title>Secure Cloud</title>
+<meta name="call-build" content="Premium Call v5 - 2026-10-05"><title>Secure Cloud</title>
 <script>document.documentElement.classList.add("lite")</script>
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js">
@@ -463,6 +463,25 @@ html.lite #call.ctl-hidden .cv-ui{transition:opacity .22s ease,transform .22s ea
 #call #tapPlay{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
 @media (max-width:480px){#call .cv-pip{border-radius:13px}}
 </style>
+<style id="call-premium-v4">
+#call .cv-more{min-width:190px;padding:8px;border:1px solid rgba(255,255,255,.10);background:rgba(11,18,32,.94);backdrop-filter:blur(22px) saturate(1.25);-webkit-backdrop-filter:blur(22px) saturate(1.25);box-shadow:0 18px 50px rgba(0,0,0,.45);border-radius:18px}
+#call .cv-more button{display:flex;align-items:center;width:100%;min-height:48px;padding:0 14px;border-radius:12px;color:#f8fafc;background:transparent;font-size:15px;font-weight:600;text-align:left}
+#call .cv-more button:active{background:rgba(255,255,255,.10);transform:scale(.985)}
+#call .cv-pip{will-change:left,top,transform;max-width:42vw;max-height:30vh;border:2px solid rgba(255,255,255,.9);box-shadow:0 10px 32px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.10);background:#080b12}
+#call .cv-pip.dragging{box-shadow:0 14px 42px rgba(0,0,0,.62),0 0 0 2px rgba(255,255,255,.22);transform:scale(1.015)}
+#call.ctl-hidden .cv-pip{opacity:1!important;visibility:visible!important}
+</style>
+
+<style id="call-premium-v5">
+/* ===== Premium Call v5: fixed 2-item menu + free-position PiP ===== */
+#call .cv-more{min-width:176px;max-width:220px;padding:7px;border:1px solid rgba(255,255,255,.12);background:rgba(9,16,30,.96);backdrop-filter:blur(24px) saturate(1.3);-webkit-backdrop-filter:blur(24px) saturate(1.3);border-radius:17px;box-shadow:0 18px 55px rgba(0,0,0,.55)}
+#call .cv-more button{min-height:46px;padding:0 13px;border-radius:11px;font-size:14px;font-weight:650}
+#call .cv-more button:active{background:rgba(255,255,255,.12);transform:scale(.985)}
+#call .cv-pip{touch-action:none!important;cursor:grab;z-index:12!important;will-change:left,top,transform;transition:left .16s cubic-bezier(.22,1,.36,1),top .16s cubic-bezier(.22,1,.36,1),transform .16s ease,box-shadow .16s ease}
+#call .cv-pip.dragging{cursor:grabbing!important;transition:none!important;transform:scale(1.025);box-shadow:0 18px 42px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.18)}
+#call.ctl-hidden .cv-pip{opacity:1!important;visibility:visible!important;pointer-events:auto!important}
+#call #flipCam:not(.hidden){display:flex}
+</style>
 </head>
 <body>
 <div id="app">
@@ -618,13 +637,7 @@ html.lite #call.ctl-hidden .cv-ui{transition:opacity .22s ease,transform .22s ea
 </button>
 <div id="callMore" class="cv-more hidden" role="menu" aria-label="More call options">
 <button id="mDetect" type="button" role="menuitem">Detect device</button>
-<button id="mSwap" type="button" role="menuitem">Swap video</button>
-<button id="mFit" type="button" role="menuitem">Fit to screen</button>
-<button id="mSaver" type="button" role="menuitemcheckbox" aria-checked="false">Low data mode</button>
-<button id="mStats" type="button" role="menuitemcheckbox" aria-checked="false">Call stats</button>
 <button id="mFull" type="button" role="menuitem">Full screen</button>
-<button id="mPip" type="button" role="menuitem">Picture-in-picture</button>
-<button id="mOut" type="button" role="menuitem">Audio output</button>
 </div>
 </div>
 </div>
@@ -901,46 +914,54 @@ function updateFit(){
 }
 function sizePip(){
  const v=pipEl();if(!v||v.classList.contains("hidden"))return;
- const CW=call.clientWidth||360,CH=call.clientHeight||640,compact=CW<480;
- const w=Math.round(Math.max(104,Math.min(compact?CW*.30:CW*.23,220)));
- const ar=(v.videoWidth&&v.videoHeight)?v.videoWidth/v.videoHeight:(CW>CH?16/9:9/16);
- const h=Math.round(w/Math.max(.6,Math.min(2,ar)));
- v.style.width=w+"px";v.style.height=Math.max(96,Math.min(CH*.32,h))+"px"
+ const CW=call.clientWidth||360,CH=call.clientHeight||640;
+ const w=Math.round(Math.max(104,Math.min(CW<=480?CW*.29:CW*.21,176)));
+ const ar=(v.videoWidth&&v.videoHeight)?v.videoWidth/v.videoHeight:9/16;
+ const h=Math.round(w/Math.max(.58,Math.min(2,ar)));
+ v.style.width=w+"px";v.style.height=Math.max(88,Math.min(CH*.30,h))+"px";
+ if(pipPos.x!==null)clampPipPos();
+}
+let pipPos={x:null,y:null};
+function clampPipPos(){
+ const v=pipEl();if(!v||v.classList.contains("hidden"))return;
+ const W=call.clientWidth,H=call.clientHeight,w=v.offsetWidth,h=v.offsetHeight,m=10,sa=safeInsets();
+ const minX=m,maxX=Math.max(minX,W-w-m),minY=Math.max(m,sa.t+6),maxY=Math.max(minY,H-h-Math.max(m,sa.b+6));
+ if(pipPos.x===null||pipPos.y===null){pipPos.x=maxX;pipPos.y=minY}
+ pipPos.x=Math.max(minX,Math.min(maxX,pipPos.x));pipPos.y=Math.max(minY,Math.min(maxY,pipPos.y));
+ v.style.left=Math.round(pipPos.x)+"px";v.style.top=Math.round(pipPos.y)+"px";
 }
 function placePip(){
  const v=pipEl();if(!v||v.classList.contains("hidden")||call.classList.contains("hidden"))return;
- const W=call.clientWidth,H=call.clientHeight;if(!W||!H)return;
- const w=v.offsetWidth,h=v.offsetHeight,m=Math.max(12,Math.min(20,W*.035)),sa=safeInsets();
- const topSafe=sa.t+Math.max(14,Math.min(72,H*.09));
- const bottomSafe=Math.max(14,sa.b+($("callBar").offsetHeight||110)*.55);
- const minY=topSafe,maxY=Math.max(minY,H-h-bottomSafe);
- const x=pipCorner.includes("l")?m:W-w-m,y=pipCorner.includes("t")?minY:maxY;
- v.style.left=Math.max(m,Math.min(W-w-m,x))+"px";v.style.top=Math.max(0,Math.min(H-h,y))+"px"
+ if(pipPos.x===null||pipPos.y===null){pipPos.x=null;pipPos.y=null}
+ clampPipPos();
 }
 const pipDrag={id:null,sx:0,sy:0,ox:0,oy:0,moved:false};
 function pipDown(e){
  const v=e.currentTarget;if(!v.classList.contains("cv-pip")||(e.button&&e.button>0))return;
  pipDrag.id=e.pointerId;pipDrag.sx=e.clientX;pipDrag.sy=e.clientY;pipDrag.ox=v.offsetLeft;pipDrag.oy=v.offsetTop;pipDrag.moved=false;
+ v.classList.add("dragging");
  try{v.setPointerCapture(e.pointerId)}catch{}
+ e.preventDefault();e.stopPropagation();
 }
 function pipMove(e){
- if(e.pointerId!==pipDrag.id)return;const v=e.currentTarget,dx=e.clientX-pipDrag.sx,dy=e.clientY-pipDrag.sy;
- if(!pipDrag.moved&&Math.hypot(dx,dy)<8)return;
- pipDrag.moved=true;v.classList.add("dragging");
- const W=call.clientWidth,H=call.clientHeight;
- v.style.left=Math.min(Math.max(0,pipDrag.ox+dx),W-v.offsetWidth)+"px";v.style.top=Math.min(Math.max(0,pipDrag.oy+dy),H-v.offsetHeight)+"px"
+ if(e.pointerId!==pipDrag.id)return;
+ const v=e.currentTarget,dx=e.clientX-pipDrag.sx,dy=e.clientY-pipDrag.sy,W=call.clientWidth,H=call.clientHeight;
+ if(!pipDrag.moved&&Math.hypot(dx,dy)<5)return;
+ pipDrag.moved=true;
+ const m=8,sa=safeInsets(),minX=m,maxX=Math.max(minX,W-v.offsetWidth-m),minY=Math.max(m,sa.t+4),maxY=Math.max(minY,H-v.offsetHeight-Math.max(m,sa.b+4));
+ pipPos.x=Math.max(minX,Math.min(maxX,pipDrag.ox+dx));pipPos.y=Math.max(minY,Math.min(maxY,pipDrag.oy+dy));
+ v.style.left=Math.round(pipPos.x)+"px";v.style.top=Math.round(pipPos.y)+"px";
+ e.preventDefault();e.stopPropagation();
 }
 function pipUp(e){
- if(e.pointerId!==pipDrag.id)return;const v=e.currentTarget;pipDrag.id=null;
+ if(e.pointerId!==pipDrag.id)return;
+ const v=e.currentTarget;pipDrag.id=null;
  try{v.releasePointerCapture(e.pointerId)}catch{}
  v.classList.remove("dragging");
- if(e.type==="pointercancel")return;
- if(pipDrag.moved){
-  const cx=v.offsetLeft+v.offsetWidth/2,cy=v.offsetTop+v.offsetHeight/2;
-  pipCorner=(cy<call.clientHeight/2?"t":"b")+(cx<call.clientWidth/2?"l":"r");placePip()
- }else swapVideos()
+ if(e.type!=="pointercancel"&&pipDrag.moved)clampPipPos();
+ e.preventDefault();e.stopPropagation();
 }
-function swapVideos(){if(!callIsVideo||!hasLocalVideo)return;localIsSwapped=!localIsSwapped;applyRoles();armHide()}
+function swapVideos(){return}
 
 /* ---------- controls: show / auto-hide ---------- */
 const ctlCanHide=()=>callIsVideo&&connectedOnce&&callActive&&!call.classList.contains("hidden");
@@ -956,19 +977,14 @@ function stageTap(){
 function openMore(){refreshMore();moreOpen=true;$("callMore").classList.remove("hidden");$("moreBtn").setAttribute("aria-expanded","true")}
 function closeMore(rearm=true){if(!moreOpen)return;moreOpen=false;$("callMore").classList.add("hidden");$("moreBtn").setAttribute("aria-expanded","false");rearm&&armHide()}
 function refreshMore(){
- const vid=callIsVideo;
- $("mSwap").classList.toggle("hidden",!(vid&&hasLocalVideo));
- $("mFit").classList.toggle("hidden",!vid);
- $("mFit").textContent=(mainEl().dataset.fit||"cover")==="cover"?"Fit to screen":"Fill screen";
- $("mSaver").classList.toggle("hidden",!vid);
- $("mSaver").textContent="Low data mode: "+(dataSaver?"On":"Off");$("mSaver").setAttribute("aria-checked",String(dataSaver));
- $("mStats").textContent="Call stats: "+(statsOn?"On":"Off");$("mStats").setAttribute("aria-checked",String(statsOn));
+ const box=$("callMore");if(!box)return;
+ /* Keep the menu intentionally limited to these two actions. */
+ box.innerHTML='<button id="mDetect" type="button" role="menuitem">Detect device</button><button id="mFull" type="button" role="menuitem">Full screen</button>';
  const fs=!!(document.fullscreenEnabled||document.webkitFullscreenEnabled);
- $("mFull").classList.toggle("hidden",!fs);$("mFull").textContent=(document.fullscreenElement||document.webkitFullscreenElement)?"Exit full screen":"Full screen";
- $("mPip").classList.toggle("hidden",!(vid&&document.pictureInPictureEnabled));
- const outOk=sinkSupported&&outDevs.length>1;$("mOut").classList.toggle("hidden",!outOk);
- if(outOk)$("mOut").textContent="Audio output: "+(outDevs[outIdx]?.label||"Default")
+ const f=$("mFull");
+ if(f){f.classList.toggle("hidden",!fs);f.textContent=(document.fullscreenElement||document.webkitFullscreenElement)?"Exit full screen":"Full screen"}
 }
+
 async function toggleFull(){
  try{
   if(document.fullscreenElement||document.webkitFullscreenElement){
@@ -1072,35 +1088,52 @@ function prepareStream(){
  const l=$("local");l.srcObject=vt?stream:null;applyMirror();vt&&l.play().catch(cvNoop)
 }
 async function flipCamera(){
- if(flipping||!stream||!callIsVideo)return;
+ if(flipping||!stream||!callIsVideo||!callActive)return;
  const old=stream.getVideoTracks()[0];if(!old)return;
  flipping=true;$("flipCam").disabled=true;
- const wasEnabled=old.enabled,oldDev=old.getSettings?.().deviceId,next=facing==="user"?"environment":"user",prof=qualityProfile();
- const base={width:{ideal:prof.w},height:{ideal:prof.h},frameRate:{ideal:prof.fps,max:30}};
- const open=async v=>(await navigator.mediaDevices.getUserMedia({video:{...base,...v},audio:false})).getVideoTracks()[0];
- let nt=null,usedExact=false;
- old.onended=null;old.stop(); /* release first: many phones can't open both cameras at once */
- try{nt=await open({facingMode:{exact:next}});usedExact=true}
- catch(e1){
-  try{
-   const devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==="videoinput"&&d.deviceId);
-   if(devs.length<2)throw e1;
-   const i=devs.findIndex(d=>d.deviceId===oldDev);nt=await open({deviceId:{exact:devs[(i+1)%devs.length].deviceId}})
-  }catch{
-   try{nt=await open(oldDev?{deviceId:{exact:oldDev}}:{facingMode:{ideal:facing}});callToast("Couldn't switch camera")}catch{nt=null}
-  }
- }
- if(!callActive||!stream){nt&&nt.stop();flipping=false;return}
- if(!nt){callToast("Camera unavailable");flipping=false;$("flipCam").disabled=false;cvSetBtn("toggleVideo",true,"Turn camera off","Turn camera on");signalMedia({cam:false});return}
+ const wasEnabled=old.enabled;
+ const oldSettings=old.getSettings?.()||{};
+ const next=facing==="user"?"environment":"user";
+ let nt=null;
  try{
-  nt.enabled=wasEnabled;try{nt.contentHint="motion"}catch{}
-  const senders=pc?pc.getSenders().filter(s=>s.track&&s.track.kind==="video"):[];
-  for(const s of senders){try{await s.replaceTrack(nt)}catch(err){console.warn("replaceTrack failed",err)}}
-  stream.removeTrack(old);stream.addTrack(nt);nt.onended=onLocalVideoEnded;
-  facing=trackFacing(nt,usedExact?next:"user");applyMirror();
-  const l=$("local");l.srcObject=stream;l.play().catch(cvNoop);
-  setTimeout(()=>{sizePip();placePip()},200);applyLevel()
- }finally{flipping=false;$("flipCam").disabled=false}
+  /* Fast path: select the other physical camera by deviceId. This avoids
+     waiting for an in-place constraint renegotiation on Android Chrome. */
+  let devices=[];
+  try{devices=await navigator.mediaDevices.enumerateDevices()}catch{}
+  const cams=devices.filter(d=>d.kind==="videoinput");
+  const other=cams.find(d=>d.deviceId&&d.deviceId!==oldSettings.deviceId);
+  if(other){
+   try{
+    const prof=qualityProfile();
+    const s=await navigator.mediaDevices.getUserMedia({video:{deviceId:{exact:other.deviceId},width:{ideal:prof.w},height:{ideal:prof.h},frameRate:{ideal:prof.fps,max:30}},audio:false});
+    nt=s.getVideoTracks()[0]||null;
+   }catch(e){console.debug("deviceId flip fallback:",e&&e.name)}
+  }
+  /* Fallback for browsers that hide device ids until permission is granted. */
+  if(!nt){
+   try{await old.applyConstraints({facingMode:{exact:next}});nt=old}catch(e){
+    try{
+     const prof=qualityProfile();
+     const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:next},width:{ideal:prof.w},height:{ideal:prof.h},frameRate:{ideal:prof.fps,max:30}},audio:false});
+     nt=s.getVideoTracks()[0]||null;
+    }catch(e2){console.warn("camera flip failed",e,e2)}
+   }
+  }
+  if(!nt){callToast("Couldn't switch camera",1800);return}
+  if(nt!==old){
+   nt.enabled=wasEnabled;try{nt.contentHint="motion"}catch{}
+   const senders=pc?pc.getSenders().filter(x=>x.track&&x.track.kind==="video"):[];
+   for(const sender of senders){try{await sender.replaceTrack(nt)}catch(err){console.warn("replaceTrack failed",err)}}
+   stream.removeTrack(old);stream.addTrack(nt);old.onended=null;old.stop();nt.onended=onLocalVideoEnded;
+  }else old.enabled=wasEnabled;
+  facing=next;applyMirror();
+  const l=$("local");l.srcObject=stream;await l.play().catch(cvNoop);
+  sizePip();placePip();signalMedia({cam:wasEnabled});
+  callToast(next==="environment"?"Back camera":"Front camera",900);
+  refreshDevices();
+ }finally{
+  flipping=false;$("flipCam").disabled=false;
+ }
 }
 
 /* ---------- adaptive quality (resolution / fps / bitrate) ---------- */
@@ -1301,12 +1334,12 @@ function setupCallScreen(video,localVideo){
  const prof=qualityProfile();
  callIsVideo=!!video;hasLocalVideo=!!video&&!!localVideo;connectedOnce=false;remoteVideoLive=false;peerCamOff=false;peerMicOff=false;
  localIsSwapped=false;speakerOn=false;fitPref=null;dataSaver=false;statsOn=false;needUnmute=false;reconnecting=false;netPoor=false;lastNetQ="good";
- qBase=prof.level;qLevel=prof.level;upNeed=5;goodStreak=0;badStreak=0;pipCorner="tr";moreOpen=false;ctlVisible=true;recoveryStep=0;
+ qBase=prof.level;qLevel=prof.level;upNeed=5;goodStreak=0;badStreak=0;pipCorner="tr";pipPos={x:null,y:null};moreOpen=false;ctlVisible=true;recoveryStep=0;
  call.classList.remove("cv-live","ctl-hidden");call.classList.toggle("cv-audio",!video);
  $("callMore").classList.add("hidden");$("moreBtn").setAttribute("aria-expanded","false");$("callStats").classList.add("hidden");$("tapPlay").classList.add("hidden");
  $("peerMic").classList.add("hidden");$("netQ").classList.add("hidden");$("netQ").dataset.q="good";refreshPill();disarmEnd();
  cvSetBtn("mute",false,"Mute microphone","Unmute microphone");cvSetBtn("toggleVideo",false,"Turn camera off","Turn camera on");loudOn=false;lastExtId=null;cvSetBtn("speaker",true,"Turn speaker off","Turn speaker on");deviceAdapted=false;deviceKind="";clearTimeout(adaptTimer);call.style.removeProperty("--call-w");document.querySelector(".cv-morewrap").classList.toggle("hidden",!video);
- $("toggleVideo").classList.toggle("hidden",!hasLocalVideo);$("flipCam").classList.add("hidden");
+ $("toggleVideo").classList.toggle("hidden",!hasLocalVideo);$("flipCam").classList.toggle("hidden",!hasLocalVideo);
  $("remote").muted=true;$("callName").textContent=cap(partnerId);
  setCallAvatar($("callAvatarImg"),$("callAvatarInitial"),partnerId);$("callAvatarWrap").classList.remove("connected");
  stopCallTimer();applyRoles();refreshDevices()
@@ -1394,7 +1427,7 @@ function reset(){
  stopStream(stream);
  try{$("remote").pause()}catch{}
  $("remote").srcObject=null;$("local").srcObject=null;
- stream=null;pending=null;queued=[];amCaller=false;restartInProgress=false;callId=null;
+ stream=null;pending=null;queued=[];amCaller=false;pipPos={x:null,y:null};restartInProgress=false;callId=null;
  mySeq=0;lastAppliedRestartSeq=0;lastAppliedAnswerSeq=0;hardReconnectDone=false;calleeHardened=false;recoveryStep=0;
  connectedOnce=false;flipping=false;reconnecting=false;netPoor=false;moreOpen=false;endArmed=false;needUnmute=false;localIsSwapped=false;speakerOn=false;loudOn=false;lastExtId=null;
  try{document.fullscreenElement&&document.exitFullscreen().catch(cvNoop)}catch{}
@@ -1449,13 +1482,7 @@ function reset(){
   const b=e.target.closest("button");if(!b)return;
   switch(b.id){
    case"mDetect":detectDevice();break;
-   case"mSwap":swapVideos();break;
-   case"mFit":fitPref=(mainEl().dataset.fit||"cover")==="cover"?"contain":"cover";updateFit();break;
-   case"mSaver":dataSaver=!dataSaver;if(dataSaver&&qLevel<2)qLevel=2;applyLevel();callToast(dataSaver?"Low data mode on":"Low data mode off");break;
-   case"mStats":statsOn=!statsOn;$("callStats").classList.toggle("hidden",!statsOn);statsOn&&($("callStats").textContent="Collecting…");break;
    case"mFull":toggleFull();break;
-   case"mPip":togglePip();break;
-   case"mOut":cycleOutput();break
   }
   closeMore()
  })

@@ -388,7 +388,6 @@ html.lite #call .cv-pip.dragging{transition:none!important}
 #call .cv-top{position:absolute;left:0;right:0;top:0;z-index:8;display:flex;flex-direction:column;align-items:center;gap:2px;padding:calc(10px + env(safe-area-inset-top,0px)) 64px 38px;background:linear-gradient(to bottom,rgba(0,0,0,.55),rgba(0,0,0,0));pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.6)}
 #call .cv-top b{font-size:clamp(16px,4.6vw,20px);font-weight:700;letter-spacing:-.01em;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #call .cv-top p{margin:0;font-size:13px;opacity:.9;font-variant-numeric:tabular-nums}
-#call.cv-live #callState{display:none}
 #call .netq{position:absolute;right:max(16px,env(safe-area-inset-right,0px));top:calc(14px + env(safe-area-inset-top,0px));display:flex;align-items:flex-end;gap:2px;height:14px}
 #call .netq i{display:block;width:4px;border-radius:2px;background:rgba(255,255,255,.35)}
 #call .netq i:nth-child(1){height:6px}#call .netq i:nth-child(2){height:10px}#call .netq i:nth-child(3){height:14px}
@@ -406,10 +405,13 @@ html.lite #call .cv-toast{transition:opacity .2s ease!important}
 #call .cv-row{display:flex;gap:10px;align-items:center;justify-content:center}
 #call .cv-btn{flex:0 0 auto;width:clamp(44px,13vw,56px);height:clamp(44px,13vw,56px);padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.22);box-shadow:none;position:relative}
 #call .cv-btn svg{width:46%;height:46%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-#call .cv-btn .ic-off{display:none}
+#call .cv-btn .ic-off,#call .cv-btn .ic-ear{display:none}
+#call .cv-btn.has-external .ic-on,#call .cv-btn.has-external .ic-off{display:none}
+#call .cv-btn.has-external .ic-ear{display:block}
 #call .cv-btn.is-off{background:#fff;color:#0f172a;border-color:#fff}
 #call .cv-btn.is-off .ic-on{display:none}
 #call .cv-btn.is-off .ic-off{display:block}
+#call .cv-btn.has-external.is-off .ic-off{display:none}
 #call .cv-btn:disabled{opacity:.5}
 #call .cv-btn:focus-visible,#call .cv-end:focus-visible,#call .cv-more button:focus-visible{outline:3px solid #fff;outline-offset:2px}
 #call .cv-end{display:flex;align-items:center;justify-content:center;gap:10px;min-width:min(240px,64vw);height:56px;padding:0 26px;border-radius:999px;border:0;background:#e11d2e;color:#fff;font-weight:700;font-size:15px;letter-spacing:.01em;box-shadow:0 8px 24px rgba(225,29,46,.45);position:relative}
@@ -433,13 +435,33 @@ html.lite #call.ctl-hidden .cv-ui{transition:opacity .22s ease,transform .22s ea
 #call .cv-bar{pointer-events:none}#call .cv-bar>*{pointer-events:auto}
 </style>
 <style id="call-mobile-ratio">
-#call{left:0!important;right:0!important;margin:0 auto!important;width:var(--call-w,min(100vw,calc(100dvh*9/16)))!important;box-shadow:0 0 0 100vmax #05070b}
+/* Responsive call stage: full available viewport on phones, tablets and desktops. */
+#call{left:0!important;right:0!important;margin:0!important;width:100vw!important;max-width:none!important;box-shadow:none!important}
 #call .cv-main{object-fit:cover!important}
-#call #callStats,#call #netQ{display:none!important}
 #call .cv-main.fit-contain{object-fit:contain!important}
-#callMore button:not(#mDetect){display:none!important}
-#call #callMore{min-width:160px}
+#call #callStats,#call #netQ{display:none!important}
+#call #callMore{min-width:190px}
 #call .cv-end{min-width:min(200px,56vw)}
+@media (min-width:768px){#call .cv-bar{padding-left:24px;padding-right:24px}#call .cv-pip{border-radius:16px}}
+</style>
+<style id="call-premium-finish">
+/* Premium calling UX */
+#call{isolation:isolate}
+#call .cv-main{will-change:transform;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+#call .cv-pip{min-width:96px;min-height:96px;overflow:hidden;background:#0b0f14;border:2px solid rgba(255,255,255,.88);box-shadow:0 10px 30px rgba(0,0,0,.48),0 2px 8px rgba(0,0,0,.28);-webkit-user-select:none;user-select:none}
+#call .cv-pip::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);pointer-events:none}
+#call .cv-pip.dragging{transform:scale(1.025);box-shadow:0 16px 36px rgba(0,0,0,.58);z-index:20}
+#call.ctl-hidden .cv-pip{filter:none;opacity:1;visibility:visible;pointer-events:auto}
+#call .cv-pip{transition:left .18s cubic-bezier(.22,1,.36,1),top .18s cubic-bezier(.22,1,.36,1),transform .18s ease,box-shadow .18s ease}
+#call .cv-pip.dragging{transition:none}
+#call .cv-bar{transition:opacity .22s ease,transform .22s ease}
+#call.ctl-hidden .cv-bar{transform:translate3d(0,18px,0)}
+#call .cv-top{transition:opacity .22s ease,transform .22s ease}
+#call.ctl-hidden .cv-top{transform:translate3d(0,-14px,0)}
+#call .cv-btn{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#call .cv-ui{will-change:opacity,transform}
+#call #tapPlay{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+@media (max-width:480px){#call .cv-pip{border-radius:13px}}
 </style>
 </head>
 <body>
@@ -585,9 +607,10 @@ html.lite #call.ctl-hidden .cv-ui{transition:opacity .22s ease,transform .22s ea
 <button id="flipCam" type="button" class="cv-btn hidden" title="Flip camera" aria-label="Flip camera">
 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8h-9a5 5 0 0 0-5 5"/><path d="M4 16h9a5 5 0 0 0 5-5"/><path d="M17 5l3 3-3 3M7 13l-3 3 3 3"/></svg>
 </button>
-<button id="speaker" type="button" class="cv-btn" title="Turn speaker off" aria-label="Turn speaker off" aria-pressed="false">
+<button id="speaker" type="button" class="cv-btn is-off" title="Turn speaker on" aria-label="Turn speaker on" aria-pressed="true">
 <svg class="ic-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
 <svg class="ic-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>
+<svg class="ic-ear" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13v-2a9 9 0 0 1 18 0v2"/><path d="M3 13v4a2 2 0 0 0 2 2h2v-7H5a2 2 0 0 0-2 2ZM21 13v4a2 2 0 0 1-2 2h-2v-7h2a2 2 0 0 1 2 2Z"/><path d="M17 19c-.5 1.2-1.6 2-3 2h-2"/></svg>
 </button>
 <div class="cv-morewrap">
 <button id="moreBtn" type="button" class="cv-btn" title="More options" aria-label="More options" aria-haspopup="menu" aria-expanded="false">
@@ -878,17 +901,21 @@ function updateFit(){
 }
 function sizePip(){
  const v=pipEl();if(!v||v.classList.contains("hidden"))return;
- const CW=call.clientWidth||360,CH=call.clientHeight||640,land=deviceAdapted&&CW>CH;
- const w=land?Math.round(Math.max(120,Math.min(CW*.22,220))):Math.round(Math.max(96,Math.min(CW*.3,150)));
- v.style.width=w+"px";v.style.height=Math.round(land?w*9/16:w/.6)+"px"
+ const CW=call.clientWidth||360,CH=call.clientHeight||640,compact=CW<480;
+ const w=Math.round(Math.max(104,Math.min(compact?CW*.30:CW*.23,220)));
+ const ar=(v.videoWidth&&v.videoHeight)?v.videoWidth/v.videoHeight:(CW>CH?16/9:9/16);
+ const h=Math.round(w/Math.max(.6,Math.min(2,ar)));
+ v.style.width=w+"px";v.style.height=Math.max(96,Math.min(CH*.32,h))+"px"
 }
 function placePip(){
  const v=pipEl();if(!v||v.classList.contains("hidden")||call.classList.contains("hidden"))return;
  const W=call.clientWidth,H=call.clientHeight;if(!W||!H)return;
- const w=v.offsetWidth,h=v.offsetHeight,m=12,sa=safeInsets(),bar=$("callBar").offsetHeight||110,
-  topY=sa.t+68,botY=Math.max(m,bar-24);
- const x=pipCorner.includes("l")?m:W-w-m,y=pipCorner.includes("t")?topY:H-h-botY;
- v.style.left=Math.max(0,x)+"px";v.style.top=Math.max(0,y)+"px"
+ const w=v.offsetWidth,h=v.offsetHeight,m=Math.max(12,Math.min(20,W*.035)),sa=safeInsets();
+ const topSafe=sa.t+Math.max(14,Math.min(72,H*.09));
+ const bottomSafe=Math.max(14,sa.b+($("callBar").offsetHeight||110)*.55);
+ const minY=topSafe,maxY=Math.max(minY,H-h-bottomSafe);
+ const x=pipCorner.includes("l")?m:W-w-m,y=pipCorner.includes("t")?minY:maxY;
+ v.style.left=Math.max(m,Math.min(W-w-m,x))+"px";v.style.top=Math.max(0,Math.min(H-h,y))+"px"
 }
 const pipDrag={id:null,sx:0,sy:0,ox:0,oy:0,moved:false};
 function pipDown(e){
@@ -944,8 +971,14 @@ function refreshMore(){
 }
 async function toggleFull(){
  try{
-  if(document.fullscreenElement||document.webkitFullscreenElement)await(document.exitFullscreen||document.webkitExitFullscreen).call(document);
-  else await(call.requestFullscreen||call.webkitRequestFullscreen).call(call)
+  if(document.fullscreenElement||document.webkitFullscreenElement){
+   const exit=document.exitFullscreen||document.webkitExitFullscreen;
+   if(exit)await exit.call(document); else throw new Error("fullscreen unavailable");
+  }else{
+   const enter=call.requestFullscreen||call.webkitRequestFullscreen;
+   if(enter)await enter.call(call); else throw new Error("fullscreen unavailable");
+  }
+  setTimeout(()=>{sizePip();placePip();updateFit()},120);
  }catch{callToast("Full screen isn't available here")}
 }
 async function togglePip(){
@@ -995,11 +1028,12 @@ let loudOn=false,lastExtId=null;
 const isExtOut=d=>/bluetooth|headset|headphone|earphone|earbud|airpod|buds|a2dp|hands-?free|usb|wired/i.test(d.label||"")&&!/speakerphone|built-?in/i.test(d.label||"");
 async function routeAudio(announce){
  const ext=outDevs.find(isExtOut),ear=sinkSupported?outDevs.find(d=>/earpiece|receiver/i.test(d.label||"")):null,spk=outDevs.find(d=>/speaker/i.test(d.label||"")&&!/earpiece/i.test(d.label||""));
- const r=$("remote"),useEar=!loudOn&&!ext&&!!ear,muteIt=!loudOn&&!useEar;
+ const r=$("remote"),useEar=!loudOn&&!ext&&!!ear,muteIt=!loudOn&&!useEar&&!ext;
+ $("speaker").classList.toggle("has-external",!!ext);
  speakerOn=!muteIt;
  if(muteIt)r.muted=true;else if(!needUnmute)r.muted=false;
  if(sinkSupported){
-  const t=loudOn?(ext||spk||null):(useEar?ear:null);
+  const t=ext||(loudOn?spk:null)||(useEar?ear:null);
   try{await r.setSinkId(t?t.deviceId:"")}catch(e){console.debug("setSinkId skipped",e&&e.name)}
  }
  const id=ext?ext.deviceId:null;
@@ -1205,6 +1239,7 @@ function watchCallState(){
   if(d.ended||d.status==="rejected"||d.status==="cancelled"||d.status==="busy"){
    endedByRemote(d.status==="rejected"?"Call declined":d.status==="busy"?"User is busy on another call":d.status==="failed"?"Call failed. The connection could not be established.":"Call ended",d.status==="failed");return
   }
+  if(amCaller&&!connectedOnce&&d.recipientReachedAt&&d.status!=="answering")setCallState("Ringing…",false);
   if(d.connectedAt&&!callConnectedAt){startCallTimer(d.connectedAt);stopRing();$("callAvatarWrap").classList.add("connected")}
   const m=d.media&&d.media[partnerId];
   if(m){const co=m.cam===false,mo=m.mic===false;if(co!==peerCamOff||mo!==peerMicOff){peerCamOff=co;peerMicOff=mo;updateBackdrop();$("peerMic").classList.toggle("hidden",!mo)}}
@@ -1265,14 +1300,14 @@ function watch(owner){
 function setupCallScreen(video,localVideo){
  const prof=qualityProfile();
  callIsVideo=!!video;hasLocalVideo=!!video&&!!localVideo;connectedOnce=false;remoteVideoLive=false;peerCamOff=false;peerMicOff=false;
- localIsSwapped=false;speakerOn=true;fitPref=null;dataSaver=false;statsOn=false;needUnmute=false;reconnecting=false;netPoor=false;lastNetQ="good";
+ localIsSwapped=false;speakerOn=false;fitPref=null;dataSaver=false;statsOn=false;needUnmute=false;reconnecting=false;netPoor=false;lastNetQ="good";
  qBase=prof.level;qLevel=prof.level;upNeed=5;goodStreak=0;badStreak=0;pipCorner="tr";moreOpen=false;ctlVisible=true;recoveryStep=0;
  call.classList.remove("cv-live","ctl-hidden");call.classList.toggle("cv-audio",!video);
  $("callMore").classList.add("hidden");$("moreBtn").setAttribute("aria-expanded","false");$("callStats").classList.add("hidden");$("tapPlay").classList.add("hidden");
  $("peerMic").classList.add("hidden");$("netQ").classList.add("hidden");$("netQ").dataset.q="good";refreshPill();disarmEnd();
- cvSetBtn("mute",false,"Mute microphone","Unmute microphone");cvSetBtn("toggleVideo",false,"Turn camera off","Turn camera on");loudOn=true;lastExtId=null;cvSetBtn("speaker",false,"Turn speaker off","Turn speaker on");deviceAdapted=false;deviceKind="";clearTimeout(adaptTimer);call.style.removeProperty("--call-w");document.querySelector(".cv-morewrap").classList.toggle("hidden",!video);
+ cvSetBtn("mute",false,"Mute microphone","Unmute microphone");cvSetBtn("toggleVideo",false,"Turn camera off","Turn camera on");loudOn=false;lastExtId=null;cvSetBtn("speaker",true,"Turn speaker off","Turn speaker on");deviceAdapted=false;deviceKind="";clearTimeout(adaptTimer);call.style.removeProperty("--call-w");document.querySelector(".cv-morewrap").classList.toggle("hidden",!video);
  $("toggleVideo").classList.toggle("hidden",!hasLocalVideo);$("flipCam").classList.add("hidden");
- $("remote").muted=false;$("callName").textContent=cap(partnerId);
+ $("remote").muted=true;$("callName").textContent=cap(partnerId);
  setCallAvatar($("callAvatarImg"),$("callAvatarInitial"),partnerId);$("callAvatarWrap").classList.remove("connected");
  stopCallTimer();applyRoles();refreshDevices()
 }
@@ -1296,8 +1331,8 @@ async function start(video){
   await mainReady;const p=peer(true),offer=await p.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:video});
   await p.setLocalDescription(offer);applyLevel();
   await setDoc(D("active_calls",partnerId),{caller:myId,type:video?"video":"audio",offer:{type:offer.type,sdp:offer.sdp},callId,timestamp:Date.now()});
-  await setDoc(D("call_state",callId),{status:"ringing",caller:myId,callee:partnerId,createdAt:Date.now()},{merge:true});
-  watchCallState();setCallState("Ringing…",false);
+  await setDoc(D("call_state",callId),{status:"calling",caller:myId,callee:partnerId,createdAt:Date.now()},{merge:true});
+  watchCallState();
   noAnswerTimer=setTimeout(()=>{noAnswerTimer=null;callActive&&!connectedOnce&&finishCall("cancelled",{msg:"No answer"})},RING_TIMEOUT_MS);
   const id=callId;
   unAnswer=onSnapshot(D("call_answers",id),async snap=>{
@@ -1361,7 +1396,7 @@ function reset(){
  $("remote").srcObject=null;$("local").srcObject=null;
  stream=null;pending=null;queued=[];amCaller=false;restartInProgress=false;callId=null;
  mySeq=0;lastAppliedRestartSeq=0;lastAppliedAnswerSeq=0;hardReconnectDone=false;calleeHardened=false;recoveryStep=0;
- connectedOnce=false;flipping=false;reconnecting=false;netPoor=false;moreOpen=false;endArmed=false;needUnmute=false;localIsSwapped=false;speakerOn=true;loudOn=true;lastExtId=null;
+ connectedOnce=false;flipping=false;reconnecting=false;netPoor=false;moreOpen=false;endArmed=false;needUnmute=false;localIsSwapped=false;speakerOn=false;loudOn=false;lastExtId=null;
  try{document.fullscreenElement&&document.exitFullscreen().catch(cvNoop)}catch{}
  try{document.pictureInPictureElement&&document.exitPictureInPicture().catch(cvNoop)}catch{}
  $("callAvatarWrap").classList.remove("connected");$("callMore").classList.add("hidden");$("callStats").classList.add("hidden");$("tapPlay").classList.add("hidden");$("callToast").classList.remove("show");
@@ -1813,6 +1848,19 @@ row.append(av,mid,right);box.append(row);
 });
 }
 })();
+
+let unReachWatch=null;
+const listenIncomingNowBase=listenIncomingNow;
+listenIncomingNow=function(){
+ listenIncomingNowBase();
+ unReachWatch?.();
+ unReachWatch=onSnapshot(D("active_calls",myId),snap=>{
+  const d=snap.data();
+  if(callActive||!d?.caller||!d.callId||Date.now()-Number(d.timestamp||0)>=3e4)return;
+  setDoc(D("call_state",d.callId),{status:"ringing",recipientReachedAt:Date.now()},{merge:true}).catch(e=>console.warn("Call reach acknowledgement failed:",e))
+ },e=>console.warn("Incoming-call reach listener error:",e))
+};
+startRing=()=>{stopRing()};
 
 </script>
 <script>(function(){try{const svg=x=>'url("data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">'+x+"</svg>")+'")',ring=(n,rx,ry,cy,fill,stroke)=>Array.from({length:n},(_,i)=>'<ellipse cx="20" cy="'+cy+'" rx="'+rx+'" ry="'+ry+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width=".8" transform="rotate('+i*360/n+' 20 20)"/>').join(""),FLOWERS=[svg('<circle cx="20" cy="20" r="18" fill="#db2777"/><circle cx="20" cy="20" r="14" fill="#ec4899"/><circle cx="20" cy="20" r="10" fill="#f472b6"/><path d="M20 12a8 8 0 1 1-8 8M20 15.5a4.5 4.5 0 1 1-4.5 4.5M20 19a1.5 1.5 0 1 1-1.5 1.5" fill="none" stroke="#9d174d" stroke-width="1.4" stroke-linecap="round"/>'),svg(ring(14,3.4,7.5,11,"#f59e0b","#d97706")+ring(10,3,5.2,13,"#fbbf24","#f59e0b")+'<circle cx="20" cy="20" r="4.2" fill="#b45309"/>'),svg(ring(5,5.2,9,11,"#ffffff","#fde68a")+'<circle cx="20" cy="20" r="2.8" fill="#fbbf24"/>'),svg(ring(5,7.5,8.5,12.5,"#e11d48","#9f1239")+'<circle cx="20" cy="20" r="3.4" fill="#fde047"/><path d="M20 20L20 9" stroke="#fde047" stroke-width="1.4"/>'),svg('<path d="M20 3C32 12 32 30 20 37 8 30 8 12 20 3Z" fill="#f9a8d4"/><path d="M20 8v24" stroke="#f472b6" stroke-width="1.2"/>'),svg('<path d="M20 3C32 12 32 30 20 37 8 30 8 12 20 3Z" fill="#fb923c"/><path d="M20 8v24" stroke="#ea580c" stroke-width="1.2"/>')];document.querySelectorAll(".login-petals").forEach(box=>{const N=document.documentElement.classList.contains("lite")?16:matchMedia("(max-width:480px)").matches?22:30;for(let i=0;i<N;i++){const f=document.createElement("span");f.className="flower";const size=14+Math.random()*24;f.style.width=f.style.height=size+"px",f.style.backgroundImage=FLOWERS[i%FLOWERS.length],f.style.left=Math.random()*100+"%",f.style.setProperty("--dx",Math.random()*120-60+"px"),f.style.setProperty("--rot",(Math.random()<.5?-1:1)*(180+Math.random()*360)+"deg"),f.style.setProperty("--dur",7+Math.random()*7+"s"),f.style.setProperty("--del",-Math.random()*14+"s"),size<20&&(f.style.filter="blur(.6px) drop-shadow(0 2px 3px rgba(76,5,25,.3))"),box.appendChild(f)}});const mid=document.getElementById("myId"),pid=document.getElementById("partnerId"),btn=document.getElementById("connect");mid.addEventListener("keydown",e=>{e.key==="Enter"&&(e.preventDefault(),pid.focus())}),pid.addEventListener("keydown",e=>{e.key==="Enter"&&(e.preventDefault(),!btn.disabled&&!btn.classList.contains("is-loading")&&btn.click())});const st=document.getElementById("loginStatus");new MutationObserver(()=>st.classList.toggle("ok",st.textContent.trim()==="Connected")).observe(st,{childList:!0,characterData:!0,subtree:!0})}catch{}})();</script>
